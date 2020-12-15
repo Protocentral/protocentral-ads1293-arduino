@@ -1,3 +1,35 @@
+//////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Demo code for the ads1293 board
+//
+//  This example plots the ecg through arduino plotter.
+//  Copyright (c) 2020 ProtoCentral
+//
+//  Arduino uno connections:
+//
+//  |MAX30003 pin label| Pin Function         |Arduino Connection|
+//  |----------------- |:--------------------:|-----------------:|
+//  | MISO             | Slave Out            |  12              |
+//  | MOSI             | Slave In             |  11              |
+//  | SCLK             | Serial Clock         |  13              |
+//  | CS               | Chip Select          |  10              |
+//  | VCC              | Digital VDD          |  +5V             |
+//  | GND              | Digital Gnd          |  Gnd             |
+//  | DRDY             | Data ready           |  02              |
+//
+//  This software is licensed under the MIT License(http://opensource.org/licenses/MIT).
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+//  NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+//  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+//  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+//  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+//
+//  For information on how to use, visit https://github.com/Protocentral/protocentral-pulsehub-arduino
+//
+/////////////////////////////////////////////////////////////////////////////////////////
+
+
 #ifndef ads1293_h_
 #define ads1293_h_
 
@@ -17,6 +49,8 @@
 #define   CMDET_EN      0x0a
 #define   CMDET_CN      0x0b
 #define   RLD_CN        0x0c
+
+
 #define   REF_CN        0x11
 #define   OSC_CN        0x12
 #define   AFE_RES       0x13
@@ -30,6 +64,7 @@
 #define   R1_RATE       0x25
 #define   DIS_EFILTER   0x26
 #define   DRDYB_SRC     0x27
+#define   SYNCB_CN     0x28
 #define   CH_CNFG       0x2f
 #define   REVID         0x40
 
@@ -40,10 +75,16 @@ class ads1293
     uint8_t drdyPin;
     uint8_t csPin;
 
-    void ads1293Begin();
+    void ads1293Begin3LeadECG();
+    void ads1293Begin5LeadECG();
+    void ads1293Begin12LeadECGmaster();
     int32_t getECGdata(uint8_t channel);
     bool readSensorID();
+    void setAds1293Pins();
     
+    uint8_t ads1293ReadRegister(uint8_t rdAddress);
+
+        
     ads1293(uint8_t drdy, uint8_t chipSelect){
       csPin = chipSelect;
       drdyPin = drdy;     
@@ -52,7 +93,7 @@ class ads1293
 
   private:
     void ads1293WriteRegister(uint8_t wrAddress, uint8_t data);
-    uint8_t ads1293ReadRegister(uint8_t rdAddress);
+
     void configDCleadoffDetect();
     void configACleadoffDetect();
     void setSamplingRate();
