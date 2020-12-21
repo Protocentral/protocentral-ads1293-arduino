@@ -7,7 +7,7 @@
 //
 //  Arduino uno connections:
 //
-//  |MAX30003 pin label| Pin Function         |Arduino Connection|
+//  |pin label         | Pin Function         |Arduino Connection|
 //  |----------------- |:--------------------:|-----------------:|
 //  | MISO             | Slave Out            |  12              |
 //  | MOSI             | Slave In             |  11              |
@@ -25,31 +25,32 @@
 //  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 //  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
-//  For information on how to use, visit https://github.com/Protocentral/protocentral-pulsehub-arduino
+//  For information on how to use, visit https://github.com/Protocentral/protocentral-ads1293-arduino
 //
 /////////////////////////////////////////////////////////////////////////////////////////
 
+
 #include "Arduino.h"
 #include <SPI.h>
-#include "ads1293.h"
+#include "protocentral_ads1293.h"
 
 
 int32_t ads1293::getECGdata(uint8_t channel){
 
   uint8_t rawData[3];
   int32_t ecgData;
-  
+
   if(channel < 1 || channel > 2){
-    channel = 0;    //defaults to channel 1 on wrong input 
+    channel = 0;    //defaults to channel 1 on wrong input
   }else channel -= 1;
-  
+
   rawData[0] = ads1293ReadRegister(0x37 + (channel * 3));
   rawData[1] = ads1293ReadRegister(0x38 + (channel * 3));
   rawData[2] = ads1293ReadRegister(0x39 + (channel * 3));
 
   uint32_t tempData = (uint32_t)rawData[0]<<16;
   tempData = (uint32_t)rawData[1]<< 8;
-  tempData |= rawData[2]; 
+  tempData |= rawData[2];
   tempData = tempData << 8;
 
   ecgData = (int32_t) (tempData);
@@ -98,10 +99,10 @@ void ads1293::ads1293Begin3LeadECG(){
   delay(1);
 
   ads1293WriteRegister(CH_CNFG, 0x30);
-  delay(1);  
+  delay(1);
 
   ads1293WriteRegister(CONFIG, 0x01);
-  delay(1);    
+  delay(1);
 }
 
 void ads1293::ads1293Begin5LeadECG(){
@@ -152,10 +153,10 @@ void ads1293::ads1293Begin5LeadECG(){
   delay(1);
 
   ads1293WriteRegister(CH_CNFG, 0x70);
-  delay(1);  
+  delay(1);
 
   ads1293WriteRegister(CONFIG, 0x01);
-  delay(1);    
+  delay(1);
 }
 
 void ads1293::ads1293Begin12LeadECGmaster(){
@@ -199,21 +200,21 @@ void ads1293::ads1293Begin12LeadECGmaster(){
 
 
   ads1293WriteRegister(DRDYB_SRC, 0x08);
-  delay(1);  
+  delay(1);
 
   ads1293WriteRegister(SYNCB_CN, 0x08);
   delay(1);
 
   ads1293WriteRegister(CH_CNFG, 0x30);
-  delay(1);  
+  delay(1);
 
   ads1293WriteRegister(CONFIG, 0x01);
-  delay(1);    
+  delay(1);
 }
 
 
 void ads1293::ads1293WriteRegister(uint8_t wrAddress, uint8_t data){
-  
+
   uint8_t dataToSend = (wrAddress & WREG);
   digitalWrite(csPin, LOW);
   SPI.transfer(dataToSend);

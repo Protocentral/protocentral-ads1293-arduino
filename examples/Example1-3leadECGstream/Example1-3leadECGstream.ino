@@ -25,7 +25,7 @@
 //  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 //  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
-//  For information on how to use, visit https://github.com/Protocentral/protocentral-pulsehub-arduino
+//  For information on how to use, visit https://github.com/Protocentral/protocentral-ads1293-arduino
 //
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,7 +33,7 @@
 #include "ads1293.h"
 #include <SPI.h>
 
-ads1293 ADS1293(02/*DRDY PIN*/, 10/*CS Pin*/); 
+ads1293 ADS1293(02/*DRDY PIN*/, 10/*CS Pin*/);
 
 bool drdyIntFlag = false;
 
@@ -51,33 +51,23 @@ void enableInterruptPin(){
 
 
 void setup() {
-  
+
   Serial.begin(9600);
   SPI.begin();
-  
-  if (ADS1293.readSensorID()){
-    Serial.println("ads1292 sensor begin");
-  }else{
-    while(1){ //stay here
-      Serial.println("sensor communication error");
-      //Serial.println(ADS1293.ads1293ReadRegister(FLEX_CH1_CN));
-      delay(10000);
-    }
-  }
-  
+
   ADS1293.ads1293Begin3LeadECG();
   //enableInterruptPin();
-  delay(10);  
+  delay(10);
 }
 
 void loop() {
-    
+
   //if (drdyIntFlag) {
   if (digitalRead(ADS1293.drdyPin) == false){
-    
+
     drdyIntFlag = false;
     int32_t ecg = ADS1293.getECGdata(1);
-    
+
     Serial.println(ecg);
   }
 }

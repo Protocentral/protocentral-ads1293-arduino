@@ -2,12 +2,11 @@
 //
 //  Demo code for the ads1293 board
 //
-//  This example plots the ecg through arduino plotter.
 //  Copyright (c) 2020 ProtoCentral
 //
 //  Arduino uno connections:
 //
-//  |MAX30003 pin label| Pin Function         |Arduino Connection|
+//  |pin label         | Pin Function         |Arduino Connection|
 //  |----------------- |:--------------------:|-----------------:|
 //  | MISO             | Slave Out            |  12              |
 //  | MOSI             | Slave In             |  11              |
@@ -25,13 +24,13 @@
 //  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 //  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
-//  For information on how to use, visit https://github.com/Protocentral/protocentral-pulsehub-arduino
+//  For information on how to use, visit https://github.com/Protocentral/protocentral-ads1293-arduino
 //
 /////////////////////////////////////////////////////////////////////////////////////////
 
 
-#ifndef ads1293_h_
-#define ads1293_h_
+#ifndef protocentral_ads1293_h_
+#define protocentral_ads1293_h_
 
 #define WREG 0x7f
 #define RREG 0x80
@@ -81,15 +80,12 @@ class ads1293
     int32_t getECGdata(uint8_t channel);
     bool readSensorID();
     void setAds1293Pins();
-    
     uint8_t ads1293ReadRegister(uint8_t rdAddress);
 
-        
     ads1293(uint8_t drdy, uint8_t chipSelect){
       csPin = chipSelect;
-      drdyPin = drdy;     
+      drdyPin = drdy;
     }
-    
 
   private:
     void ads1293WriteRegister(uint8_t wrAddress, uint8_t data);
