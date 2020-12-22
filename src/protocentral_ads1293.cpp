@@ -40,9 +40,11 @@ int32_t ads1293::getECGdata(uint8_t channel){
   uint8_t rawData[3];
   int32_t ecgData;
 
-  if(channel < 1 || channel > 2){
-    channel = 0;    //defaults to channel 1 on wrong input
-  }else channel -= 1;
+  if(channel < 1 || channel > 3){
+    return -1;    //defaults to channel 1 on wrong input
+  }else {
+    channel -= 1;
+  }
 
   rawData[0] = ads1293ReadRegister(0x37 + (channel * 3));
   rawData[1] = ads1293ReadRegister(0x38 + (channel * 3));
@@ -53,8 +55,9 @@ int32_t ads1293::getECGdata(uint8_t channel){
   tempData |= rawData[2];
   tempData = tempData << 8;
 
-  ecgData = (int32_t) (tempData);
-  return (ecgData >> 8);
+  
+  ecgData = (int32_t) (tempData); 
+  return (ecgData );
 }
 
 void ads1293::setAds1293Pins(){
@@ -65,8 +68,6 @@ void ads1293::setAds1293Pins(){
 
 void ads1293::ads1293Begin3LeadECG(){
 
-  pinMode(drdyPin, INPUT_PULLUP);
-  pinMode(csPin,   OUTPUT);
 
   ads1293WriteRegister(FLEX_CH1_CN, 0x11);
   delay(1);
@@ -107,19 +108,19 @@ void ads1293::ads1293Begin3LeadECG(){
 
 void ads1293::ads1293Begin5LeadECG(){
 
-  ads1293WriteRegister(FLEX_CH1_CN, 0x11);
+  ads1293WriteRegister(0x01, 0x11);
   delay(1);
 
-  ads1293WriteRegister(FLEX_CH2_CN, 0x19);
+  ads1293WriteRegister(0x02, 0x19);
   delay(1);
 
-  ads1293WriteRegister(FLEX_CH3_CN, 0x2e);
+  ads1293WriteRegister(0x03, 0x2e);
   delay(1);
 
-  ads1293WriteRegister(CMDET_EN, 0x07);
+  ads1293WriteRegister(0x0a, 0x07);
   delay(1);
 
-  ads1293WriteRegister(RLD_CN, 0x04);
+  ads1293WriteRegister(0x0c, 0x04);
   delay(1);
 
   ads1293WriteRegister(0x0d, 0x01);
@@ -134,83 +135,35 @@ void ads1293::ads1293Begin5LeadECG(){
   ads1293WriteRegister(0x10, 0x01);
   delay(1);
 
-  ads1293WriteRegister(OSC_CN, 0x04);
+  ads1293WriteRegister(0x12, 0x04);
   delay(1);
 
-  ads1293WriteRegister(R2_RATE, 0x02);
+//debug
+  ads1293WriteRegister(0x14, 0x04);
   delay(1);
 
-  ads1293WriteRegister(R3_RATE_CH1, 0x02);
+  ads1293WriteRegister(0x21, 0x02);
   delay(1);
 
-  ads1293WriteRegister(R3_RATE_CH2, 0x02);
+  ads1293WriteRegister(0x22, 0x02);
   delay(1);
 
-  ads1293WriteRegister(R3_RATE_CH3, 0x02);
+  ads1293WriteRegister(0x23, 0x02);
   delay(1);
 
-  ads1293WriteRegister(DRDYB_SRC, 0x08);
+  ads1293WriteRegister(0x24, 0x02);
   delay(1);
 
-  ads1293WriteRegister(CH_CNFG, 0x70);
+  ads1293WriteRegister(0x27, 0x08);
   delay(1);
 
-  ads1293WriteRegister(CONFIG, 0x01);
-  delay(1);
-}
-
-void ads1293::ads1293Begin12LeadECGmaster(){
-
-  ads1293WriteRegister(FLEX_CH1_CN, 0x11);
+  ads1293WriteRegister(0x2f, 0x70);
   delay(1);
 
-  ads1293WriteRegister(FLEX_CH2_CN, 0x19);
-  delay(1);
-
-
-  ads1293WriteRegister(CMDET_EN, 0x07);
-  delay(1);
-
-  ads1293WriteRegister(RLD_CN, 0x04);
-  delay(1);
-
-  ads1293WriteRegister(0x0d, 0x01);
-  delay(1);
-
-  ads1293WriteRegister(0x0e, 0x02);
-  delay(1);
-
-  ads1293WriteRegister(0x0f, 0x03);
-  delay(1);
-
-  ads1293WriteRegister(OSC_CN, 0x05);
-  delay(1);
-
-  ads1293WriteRegister(AFE_SHDN_CN, 0x24);
-  delay(1);
-
-  ads1293WriteRegister(R2_RATE, 0x02);
-  delay(1);
-
-  ads1293WriteRegister(R3_RATE_CH1, 0x02);
-  delay(1);
-
-  ads1293WriteRegister(R3_RATE_CH2, 0x02);
-  delay(1);
-
-
-  ads1293WriteRegister(DRDYB_SRC, 0x08);
-  delay(1);
-
-  ads1293WriteRegister(SYNCB_CN, 0x08);
-  delay(1);
-
-  ads1293WriteRegister(CH_CNFG, 0x30);
-  delay(1);
-
-  ads1293WriteRegister(CONFIG, 0x01);
+  ads1293WriteRegister(00, 0x01);
   delay(1);
 }
+
 
 
 void ads1293::ads1293WriteRegister(uint8_t wrAddress, uint8_t data){

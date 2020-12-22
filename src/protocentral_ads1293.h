@@ -76,7 +76,6 @@ class ads1293
 
     void ads1293Begin3LeadECG();
     void ads1293Begin5LeadECG();
-    void ads1293Begin12LeadECGmaster();
     int32_t getECGdata(uint8_t channel);
     bool readSensorID();
     void setAds1293Pins();

@@ -33,7 +33,7 @@
 #include "protocentral_ads1293.h"
 #include <SPI.h>
 
-ads1293 ADS1293(02/*DRDY PIN*/, 10/*CS Pin*/);
+ads1293 ADS1293(07/*DRDY PIN*/, 06/*CS Pin*/);
 
 bool drdyIntFlag = false;
 
@@ -54,7 +54,9 @@ void setup() {
   Serial.begin(9600);
   SPI.begin();
 
-  ADS1293.ads1293Begin3LeadECG();
+
+  ADS1293.setAds1293Pins();
+  ADS1293.ads1293Begin5LeadECG();
   //enableInterruptPin();
   delay(10);
 }
@@ -69,6 +71,14 @@ void loop() {
     int32_t ecgCh2 = ADS1293.getECGdata(2);
     int32_t ecgCh3 = ADS1293.getECGdata(3);
 
-    Serial.println(ecgCh1);
+    //Serial.print(ecgCh1);
+    //Serial.print(",");
+    
+    //Serial.print(ecgCh2);
+    //Serial.print(",");
+
+    Serial.print(ecgCh3);
+    Serial.println(",");
+  
   }
 }
