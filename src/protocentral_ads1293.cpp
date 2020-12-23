@@ -41,7 +41,7 @@ int32_t ads1293::getECGdata(uint8_t channel){
   int32_t ecgData;
 
   if(channel < 1 || channel > 3){
-    return -1;    //defaults to channel 1 on wrong input
+    return -1;    //return error, -1
   }else {
     channel -= 1;
   }
@@ -108,18 +108,23 @@ void ads1293::ads1293Begin3LeadECG(){
 
 void ads1293::ads1293Begin5LeadECG(){
 
+//channel 1 cn
   ads1293WriteRegister(0x01, 0x11);
   delay(1);
 
+  //channel2
   ads1293WriteRegister(0x02, 0x19);
   delay(1);
 
+///channel3 cn
   ads1293WriteRegister(0x03, 0x2e);
   delay(1);
 
+  //Common-Mode Detection and Right-Leg Drive Common-Mode Feedback Control Register
   ads1293WriteRegister(0x0a, 0x07);
   delay(1);
 
+  //RLD control
   ads1293WriteRegister(0x0c, 0x04);
   delay(1);
 
@@ -129,7 +134,7 @@ void ads1293::ads1293Begin5LeadECG(){
   ads1293WriteRegister(0x0e, 0x02);
   delay(1);
 
-  ads1293WriteRegister(0x0f, 0x03);
+  ads1293WriteRegister(0x0f, 0x03); //0000 0011
   delay(1);
 
   ads1293WriteRegister(0x10, 0x01);
@@ -138,8 +143,13 @@ void ads1293::ads1293Begin5LeadECG(){
   ads1293WriteRegister(0x12, 0x04);
   delay(1);
 
+
 //debug
-  ads1293WriteRegister(0x14, 0x04);
+ // ads1293WriteRegister(0x13, 0x07);
+  delay(1);
+
+//debug
+  ads1293WriteRegister(0x14, 0x00);
   delay(1);
 
   ads1293WriteRegister(0x21, 0x02);
@@ -192,7 +202,7 @@ bool ads1293::readSensorID(){
   uint8_t ID=0xff;
   ID = ads1293ReadRegister(REVID);
   Serial.println(ID);
-  if(ID == 0x01){
+  if(ID != 0xff){
     return true;
   }else return false;
 }
