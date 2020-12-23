@@ -224,3 +224,22 @@ void ads1293::setSamplingRate(){
 
 
 }
+
+void ads1293::disableCh1(){
+
+  ads1293WriteRegister(FLEX_CH1_CN, 0x00);
+  delay(1);
+}
+
+bool ads1293::attachTestSignal(uint8_t channel, uint8_t pol){
+
+  if((channel > 3) || (channel <1)){
+    return ERROR;
+  }
+
+  pol = (pol<<6);
+  ads1293WriteRegister(FLEX_CH1_CN  , 0xc0);
+  delay(1);
+
+  return true;
+}

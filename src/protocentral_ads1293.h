@@ -67,6 +67,10 @@
 #define   CH_CNFG       0x2f
 #define   REVID         0x40
 
+#define   POSITIVE_TST_SIG  0x01
+#define   NEGATIVE_TST_SIG  0x02
+#define   ZERO_TST_SIG  0x03
+#define   ERROR         -1
 
 class ads1293
 {
@@ -79,7 +83,9 @@ class ads1293
     int32_t getECGdata(uint8_t channel);
     bool readSensorID();
     void setAds1293Pins();
+    void disableCh1();
     uint8_t ads1293ReadRegister(uint8_t rdAddress);
+    bool attachTestSignal(uint8_t channel, uint8_t pol);
 
     ads1293(uint8_t drdy, uint8_t chipSelect){
       csPin = chipSelect;
