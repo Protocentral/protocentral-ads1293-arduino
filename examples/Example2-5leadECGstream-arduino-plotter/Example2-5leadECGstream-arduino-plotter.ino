@@ -35,7 +35,7 @@
 #include <SPI.h>
 
 #define DRDY_PIN                02
-#define CS_PIN                  06
+#define CS_PIN                  10
 
 ads1293 ADS1293(DRDY_PIN, CS_PIN);
 
@@ -60,27 +60,27 @@ void setup() {
 
   ADS1293.setAds1293Pins();
   ADS1293.ads1293Begin5LeadECG();
-  enableInterruptPin();
+  //enableInterruptPin();
   delay(10);
 }
 
 void loop() {
 
-  if (drdyIntFlag) {
-  //if (digitalRead(ADS1293.drdyPin) == false){
+  //if (drdyIntFlag) {
+  if (digitalRead(ADS1293.drdyPin) == false){
 
     drdyIntFlag = false;
     int32_t ecgCh1 = ADS1293.getECGdata(1);
     int32_t ecgCh2 = ADS1293.getECGdata(2);
     int32_t ecgCh3 = ADS1293.getECGdata(3);
 
-    //Serial.print(ecgCh1);
+    Serial.print(ecgCh1);
     //Serial.print(",");
 
     //Serial.print(ecgCh2);
     //Serial.print(",");
 
-    Serial.print(ecgCh3);
+    //Serial.print(ecgCh3);
     Serial.println(",");
   }
 }

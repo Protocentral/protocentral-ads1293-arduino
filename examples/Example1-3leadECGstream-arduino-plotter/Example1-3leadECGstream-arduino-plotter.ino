@@ -31,11 +31,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////
 
 
-#include "ads1293.h"
+#include "protocentral_ads1293.h"
 #include <SPI.h>
 
 #define DRDY_PIN                02
-#define CS_PIN                  06
+#define CS_PIN                  10
 
 ads1293 ADS1293(DRDY_PIN, CS_PIN);
 
