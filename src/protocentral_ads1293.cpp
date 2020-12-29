@@ -231,14 +231,43 @@ void ads1293::disableCh1(){
   delay(1);
 }
 
+
+void ads1293::disableFilterAllChannels(){
+
+  ads1293WriteRegister(DIS_EFILTER, 0x07);
+  delay(1);
+}
+
+
+bool ads1293::disableFilter(uint8_t channel){
+  
+  if(channel > 3 || channel < 0){
+    Serial.println("Wrong channel error!");
+    return false;
+  }
+
+  uint8_t channelBitMask = 0x01;
+  channelBitMask = channelBitMask << (channel-1);
+  ads1293WriteRegister(DIS_EFILTER, channelBitMask);
+  delay(1);
+}
+
+
+uint8_t ads1293::readErrorStatus(){
+
+  return (ads1293ReadRegister(ERR_STATUS));
+}
+
+
 bool ads1293::attachTestSignal(uint8_t channel, uint8_t pol){
 
   if((channel > 3) || (channel <1)){
+    Serial.println("Wrong channel error!");
     return ERROR;
   }
 
   pol = (pol<<6);
-  ads1293WriteRegister(FLEX_CH1_CN  , 0xc0);
+  ads1293WriteRegister((channel) , pol);
   delay(1);
 
   return true;

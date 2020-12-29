@@ -2,6 +2,7 @@
 //
 //  Demo code for the ads1293 board
 //
+//  Author: Joice Tm
 //  This example plots the ecg through arduino plotter.
 //  Copyright (c) 2020 ProtoCentral
 //
@@ -33,7 +34,10 @@
 #include "ads1293.h"
 #include <SPI.h>
 
-ads1293 ADS1293(02/*DRDY PIN*/, 10/*CS Pin*/);
+#define DRDY_PIN                02
+#define CS_PIN                  06
+
+ads1293 ADS1293(DRDY_PIN, CS_PIN);
 
 bool drdyIntFlag = false;
 

@@ -2,7 +2,10 @@
 //
 //  Demo code for the ads1293 board
 //
-//  This example plots the ecg through arduino plotter.
+//  Author: Joice Tm
+//  This example will plot the ECG through openview processing GUI.
+//  GUI URL: https://github.com/Protocentral/protocentral_openview.git
+//
 //  Copyright (c) 2020 ProtoCentral
 //
 //  Arduino uno connections:
@@ -33,9 +36,23 @@
 #include "protocentral_ads1293.h"
 #include <SPI.h>
 
-ads1293 ADS1293(07/*DRDY PIN*/, 06/*CS Pin*/);
+#define CES_CMDIF_PKT_START_1   0x0A
+#define CES_CMDIF_PKT_START_2   0xFA
+#define CES_CMDIF_TYPE_DATA     0x02
+#define CES_CMDIF_PKT_STOP      0x0B
+#define DATA_LEN                16
+#define ZERO                    0
+
+#define DRDY_PIN                02
+#define CS_PIN                  06
+
+ads1293 ADS1293(DRDY_PIN, CS_PIN);
 
 bool drdyIntFlag = false;
+
+volatile char DataPacket[16];
+const char DataPacketFooter[2] = {ZERO, CES_CMDIF_PKT_STOP};
+const char DataPacketHeader[5] = {CES_CMDIF_PKT_START_1, CES_CMDIF_PKT_START_2, DATA_LEN, ZERO, CES_CMDIF_TYPE_DATA};
 
 void drdyInterruptHndlr(){
   //Serial.println("i");
@@ -49,11 +66,47 @@ void enableInterruptPin(){
 }
 
 
+void sendDataThroughUart(int32_t ecgCh1, int32_t ecgCh2, int32_t ecgCh3){
+
+  DataPacket[0] = ecgCh1;
+  DataPacket[1] = ecgCh1 >> 8;
+  DataPacket[2] = ecgCh1 >> 16;
+  DataPacket[3] = ecgCh1 >> 24;
+
+  DataPacket[4] = ecgCh2;
+  DataPacket[5] = ecgCh2 >> 8;
+  DataPacket[6] = ecgCh2 >> 16;
+  DataPacket[7] = ecgCh2 >> 24;
+
+  DataPacket[8] = ecgCh3;
+  DataPacket[9] = ecgCh3 >> 8;
+  DataPacket[10] = ecgCh3 >> 16;
+  DataPacket[11] = ecgCh3 >> 24;
+
+  //send packet header
+  for(int i=0; i<5; i++){
+
+    Serial.write(DataPacketHeader[i]);
+  }
+
+  //send actual data
+  for(int i=0; i<16; i++){
+
+    Serial.write(DataPacket[i]);
+  }
+
+  //send packet footer
+  for(int i=0; i<2; i++){
+
+    Serial.write(DataPacketFooter[i]);
+  }
+}
+
+
 void setup() {
 
   Serial.begin(9600);
   SPI.begin();
-
 
   ADS1293.setAds1293Pins();
   ADS1293.ads1293Begin5LeadECG();
@@ -71,14 +124,6 @@ void loop() {
     int32_t ecgCh2 = ADS1293.getECGdata(2);
     int32_t ecgCh3 = ADS1293.getECGdata(3);
 
-    //Serial.print(ecgCh1);
-    //Serial.print(",");
-    
-    //Serial.print(ecgCh2);
-    //Serial.print(",");
-
-    Serial.print(ecgCh3);
-    Serial.println(",");
-  
+    sendDataThroughUart(ecgCh1, ecgCh2, ecgCh3);
   }
 }

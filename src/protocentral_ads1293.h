@@ -56,6 +56,8 @@
 #define   AFE_SHDN_CN   0x14
 #define   AFE_FAULT_CN  0x15
 #define   AFE_PACE_CN   0x17
+#define   ERR_STATUS    0x19
+#define   MASK_ERR      0x2a
 #define   R2_RATE       0x21
 #define   R3_RATE_CH1   0x22
 #define   R3_RATE_CH2   0x23
@@ -85,7 +87,12 @@ class ads1293
     void setAds1293Pins();
     void disableCh1();
     uint8_t ads1293ReadRegister(uint8_t rdAddress);
+    uint8_t readErrorStatus(uint8_t rdAddress);
     bool attachTestSignal(uint8_t channel, uint8_t pol);
+    void setSamplingRate();
+    void disableFilterAllChannels();
+    bool disableFilter(uint8_t channel);
+    uint8_t readErrorStatus();
 
     ads1293(uint8_t drdy, uint8_t chipSelect){
       csPin = chipSelect;
@@ -97,7 +104,7 @@ class ads1293
 
     void configDCleadoffDetect();
     void configACleadoffDetect();
-    void setSamplingRate();
+
 };
 
 
