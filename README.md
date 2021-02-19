@@ -1,8 +1,6 @@
 # ADS1293,3-Channel,24-BitAnalogFront-End
 
-[add product url and image here]()
-
-[description ..]
+![ads1293](https://github.com/Protocentral/protocentral_ads1293/blob/main/docs/img/IMG_20201109_210016288.jpg)
 
 Features:
 * Three High-Resolution Digital ECG Channels With Simultaneous Pace Output 
