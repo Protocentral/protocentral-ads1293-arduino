@@ -2,6 +2,8 @@
 
 ![ads1293](https://github.com/Protocentral/protocentral_ads1293/blob/main/docs/img/IMG_20201109_210016288.jpg)
 
+If you don't already have one, you can buy [ProtoCentral ADS1293 Breakout here.](https://protocentral.com/product/protocentral-ads1293-breakout-board/)
+
 Features:
 * Three High-Resolution Digital ECG Channels With Simultaneous Pace Output 
 * Low Power: 0.3 mW/channel 
@@ -13,7 +15,8 @@ Includes:
 ----------
 * 1x ProtoCentral ADS1293 breakout board
 * 1x Set of stackable Arduino headers
-* 1x ECG electrode cables
+* 2x ECG electrode cables
+* 20x disposable ECG electrodes
 
 Wiring the Breakout to your Arduino
 ------------------------------------
