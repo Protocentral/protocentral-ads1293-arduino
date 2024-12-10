@@ -241,7 +241,7 @@ void ads1293::disableFilterAllChannels(){
 
 bool ads1293::disableFilter(uint8_t channel){
   
-  if(channel > 3 || channel < 0){
+  if(channel > 3){
     Serial.println("Wrong channel error!");
     return false;
   }
@@ -250,6 +250,7 @@ bool ads1293::disableFilter(uint8_t channel){
   channelBitMask = channelBitMask << (channel-1);
   ads1293WriteRegister(DIS_EFILTER, channelBitMask);
   delay(1);
+  return true;
 }
 
 
