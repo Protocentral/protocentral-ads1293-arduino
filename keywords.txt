@@ -1,0 +1,75 @@
+#######################################
+# Syntax Coloring Map
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+ads1293 KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+ads1293Begin3LeadECG KEYWORD2
+ads1293Begin5LeadECG KEYWORD2
+getECGdata KEYWORD2
+readSensorID KEYWORD2
+setAds1293Pins KEYWORD2
+disableCh1 KEYWORD2
+ads1293ReadRegister KEYWORD2
+readErrorStatus KEYWORD2
+attachTestSignal KEYWORD2
+setSamplingRate KEYWORD2
+disableFilterAllChannels KEYWORD2
+disableFilter KEYWORD2
+readErrorStatus KEYWORD2
+ads1293WriteRegister KEYWORD2
+configDCleadoffDetect KEYWORD2
+configACleadoffDetect KEYWORD2
+ads1293 KEYWORD2
+
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+WREG LITERAL1
+RREG LITERAL1
+CONFIG  LITERAL1
+FLEX_CH1_CN   LITERAL1
+FLEX_CH2_CN   LITERAL1
+FLEX_CH3_CN  LITERAL1 
+FLEX_PACE_CN  LITERAL1
+FLEX_VBAT_CN  LITERAL1
+LOD_CN   LITERAL1     
+LOD_EN   LITERAL1     
+LOD_CURRENT  LITERAL1 
+LOD_AC_CN LITERAL1     
+CMDET_EN  LITERAL1    
+CMDET_CN LITERAL1     
+RLD_CN LITERAL1       
+REF_CN LITERAL1       
+OSC_CN LITERAL1       
+AFE_RES LITERAL1      
+AFE_SHDN_CN LITERAL1  
+AFE_FAULT_CN LITERAL1 
+AFE_PACE_CN LITERAL1  
+ERR_STATUS LITERAL1   
+MASK_ERR LITERAL1     
+R2_RATE LITERAL1      
+R3_RATE_CH1 LITERAL1  
+R3_RATE_CH2 LITERAL1  
+R3_RATE_CH3 LITERAL1  
+R1_RATE LITERAL1     
+DIS_EFILTER LITERAL1  
+DRDYB_SRC LITERAL1   
+SYNCB_CN LITERAL1   
+CH_CNFG LITERAL1     
+REVID LITERAL1        
+POSITIVE_TST_SIG LITERAL1
+NEGATIVE_TST_SIG LITERAL1
+ZERO_TST_SIG LITERAL1
+ERROR LITERAL1
+
+

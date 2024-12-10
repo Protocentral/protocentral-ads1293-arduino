@@ -1,37 +1,38 @@
-# ADS1293,3-Channel,24-BitAnalogFront-End
+Protocentral ADS1293, 3-Channel, 24-Bit Analog Front-End sensor breakout board
+================================
 
-![ads1293](https://github.com/Protocentral/protocentral_ads1293/blob/main/docs/img/IMG_20201109_210016288.jpg)
+[![Compile Examples](https://github.com/Protocentral/protocentral-ads1293-arduino/workflows/Compile%20Examples/badge.svg)](https://github.com/Protocentral/protocentral-ads1293-arduino/actions?workflow=Compile+Examples) 
 
-If you don't already have one, you can buy [ProtoCentral ADS1293 Breakout here.](https://protocentral.com/product/protocentral-ads1293-breakout-board/)
+## Don't have one? [Buy it here](https://protocentral.com/product/protocentral-ads1293-breakout-board/)
 
-Features:
-* Three High-Resolution Digital ECG Channels With Simultaneous Pace Output 
-* Low Power: 0.3 mW/channel 
-* Differential Input Voltage Range: ±400 mV
-* On board 40 MHz clock source 
-* Logic level selection between 3.3 and 5 V through jumper.
+![ADS1293 Breakout](/docs/assets/product_image.jpg) 
 
-Includes:
-----------
-* 1x ProtoCentral ADS1293 breakout board
-* 1x Set of stackable Arduino headers
-* 2x ECG electrode cables
-* 20x disposable ECG electrodes
+The ADS1293 incorporates all features commonly required in portable, low-power medical, sports, and fitness electrocardiogram (ECG) applications. The ADS1293 features three high-resolution channels, each channel can be independently programmed for a specific sample rate and bandwidth allowing users to optimize the configuration for performance and power. A fourth channel allows external analog pace detection for applications that do not use digital pace detection.
 
-Wiring the Breakout to your Arduino
-------------------------------------
- If you have bought the breakout the connection with the Arduino board is as follows:
- 
-|pin label         | Pin Function         |Arduino Connection|
-|----------------- |:--------------------:|-----------------:|
-| MISO             | Slave Out            |  12              |
-| MOSI             | Slave In             |  11              |
-| SCLK             | Serial Clock         |  13              |
-| CS               | Chip Select          |  10              |
-| VCC              | Digital VDD          |  +5V             |
-| GND              | Digital Gnd          |  Gnd             |
-| DRDY             | Data ready           |  02              |
+The ADS1293 incorporates a self-diagnostics alarm
+system to detect when the system is out of the operating conditions range. 
 
+
+## Hardware Setup
+Connection with the Arduino board is as follows:
+
+|ADS1293 pin label| Arduino Connection  |Pin Function      |
+ |:-----------------: |:---------------------:|:------------------:|
+ | MISO             | 12  |Slave Out            | 
+| MOSI             | 11      | Slave In             |
+| SCLK             | 13 | Serial Clock         |  
+| CS               | 10 | Chip Select          |  
+| Vcc              | +5V | Power          |  
+| GND              | GND | GND          | 
+| DRDY             | 02 | Data ready           |  
+
+
+For further details of the board, refer the documentation
+<center>
+
+[ ADS1293 breakout board Documentation](https://docs.protocentral.com/getting-started-with-ADS1293/)
+
+</center>
 
 License Information
 ===================
