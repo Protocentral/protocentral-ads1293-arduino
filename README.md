@@ -1,4 +1,4 @@
-Protocentral ADS1293, 3-Channel, 24-Bit Analog Front-End sensor breakout board
+Protocentral ADS1293, 3-Channel, 24-Bit ECG breakout board
 ================================
 
 [![Compile Examples](https://github.com/Protocentral/protocentral-ads1293-arduino/workflows/Compile%20Examples/badge.svg)](https://github.com/Protocentral/protocentral-ads1293-arduino/actions?workflow=Compile+Examples) 
