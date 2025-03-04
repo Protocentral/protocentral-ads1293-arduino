@@ -12,9 +12,7 @@ on:
       - ".github/workflows/compile-examples.yml"
       - "examples/**"
       - "src/**"
-  schedule:
-    # Run every Tuesday at 8 AM UTC to catch breakage caused by changes to external resources (libraries, platforms).
-    - cron: "0 8 * * TUE"
+
   workflow_dispatch:
   repository_dispatch:
 
@@ -160,7 +158,7 @@ jobs:
           
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@master
 
       - name: Install ESP32 platform dependencies
         if: startsWith(matrix.board.fqbn, 'esp32:esp32')
