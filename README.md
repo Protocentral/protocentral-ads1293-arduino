@@ -24,18 +24,21 @@ Connection with the Arduino board is as follows:
 | CS               | 10 | Chip Select          |  
 | Vcc              | +5V | Power          |  
 | GND              | GND | GND          | 
-| DRDY             | 02 | Data ready           |  
+| DRDY             | 02 | Data ready           | 
 
 
-For further details of the board, refer the documentation
-<center>
+## Visualizing Output
 
-[ ADS1293 breakout board Documentation](https://docs.protocentral.com/getting-started-with-ADS1293/)
+![streaming](./docs/assets/output.gif)
 
-</center>
+
+## For further details, refer [the documentation on ADS1293 breakout board](https://docs.protocentral.com/getting-started-with-ADS1293/)
+
 
 License Information
 ===================
+
+![License](license_mark.svg)
 
 This product is open source! Both, our hardware and software are open source and licensed under the following licenses:
 
@@ -65,4 +68,3 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 
 Please check [*LICENSE.md*](LICENSE.md) for detailed license descriptions.
-
