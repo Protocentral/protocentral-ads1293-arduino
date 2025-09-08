@@ -400,6 +400,21 @@ bool Ads1293::enableTestSignalAll(TestSignal sig)
 	return ok;
 }
 
+bool Ads1293::setChannelGainRaw(uint8_t channel, uint8_t regValue)
+{
+	if (channel < 1 || channel > 3) return false;
+	// CH1SET @ 0x0A, CH2SET @ 0x0B, CH3SET @ 0x0C
+	Register reg = static_cast<Register>(0x0A + (channel - 1));
+	bool ok = writeRegister(reg, regValue);
+	delay(1);
+	return ok;
+}
+
+bool Ads1293::setChannelGain(uint8_t channel, Ads1293::PgaGain gain)
+{
+	return setChannelGainRaw(channel, static_cast<uint8_t>(gain));
+}
+
 bool Ads1293::setSamplingRate(Ads1293::SamplingRate s)
 {
 	// Implement ODR configuration by programming the decimation stages

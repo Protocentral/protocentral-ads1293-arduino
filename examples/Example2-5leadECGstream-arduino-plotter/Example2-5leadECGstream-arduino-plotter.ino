@@ -72,6 +72,10 @@ void setup() {
   ADS1293.configureRLD(RLDMode::Default);
   ADS1293.configureRef(RefMode::Default);
   ADS1293.configureAFEShutdown(AFEShutdownMode::AFE_On);
+  // Set PGA gain=8 for all channels
+  ADS1293.setChannelGain(1, Ads1293::PgaGain::G8);
+  ADS1293.setChannelGain(2, Ads1293::PgaGain::G8);
+  ADS1293.setChannelGain(3, Ads1293::PgaGain::G8);
   // Ensure example runs at 100 SPS using the DRATE-based API
   ADS1293.setSamplingRate(Ads1293::SamplingRate::SPS_100);
   ADS1293.configureDRDYSource(DRDYSource::Default);

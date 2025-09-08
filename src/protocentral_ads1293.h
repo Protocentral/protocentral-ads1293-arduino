@@ -189,6 +189,20 @@ public:
   // Returns true if all channel routes were configured successfully.
   bool enableTestSignalAll(TestSignal sig);
 
+  // PGA gain helpers
+  // Raw write to CHnSET register (addresses 0x0A,0x0B,0x0C for channels 1..3).
+  bool setChannelGainRaw(uint8_t channel, uint8_t regValue);
+
+  // Convenience enum and wrapper for common gain presets.
+  enum class PgaGain : uint8_t {
+    G1 = 0x00,
+    G4 = 0x08, // example mapping from datasheet/example
+    G6 = 0x10,
+  G12 = 0x18,
+  G8 = 0x0C
+  };
+  bool setChannelGain(uint8_t channel, PgaGain gain);
+
   // Sampling rate presets (output data rate, ODR) supported by setSamplingRate().
   // These mappings assume the sigma-delta modulator clock fS = 102.4 kHz and
   // R1 = 4 (default). The function programs R2 and R3 registers for all three

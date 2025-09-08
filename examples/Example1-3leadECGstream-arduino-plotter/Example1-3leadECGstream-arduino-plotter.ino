@@ -109,7 +109,11 @@ void loop()
 			// Print all three channels as CSV so the Arduino plotter or a host
 			// application can parse them easily: ch1,ch2,ch3
 			Serial.print(samples.ch1);
-			Serial.print(',');
+			ADS1293.configureAFEShutdown(AFEShutdownMode::AFE_On);
+			// Set PGA gain=8 for all channels
+			ADS1293.setChannelGain(1, Ads1293::PgaGain::G8);
+			ADS1293.setChannelGain(2, Ads1293::PgaGain::G8);
+			ADS1293.setChannelGain(3, Ads1293::PgaGain::G8);
 			Serial.print(samples.ch2);
 			Serial.print(',');
 			Serial.println(samples.ch3);
