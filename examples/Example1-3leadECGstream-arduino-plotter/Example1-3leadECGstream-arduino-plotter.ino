@@ -30,48 +30,89 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////
 
-
 #include "protocentral_ads1293.h"
 #include <SPI.h>
 
-#define DRDY_PIN                02
-#define CS_PIN                  10
+#define DRDY_PIN 2
+#define CS_PIN 10
+
+// Uncomment to route the built-in positive test signal to all channels
+// #define ENABLE_TEST_SIGNAL 0
+
+// Optional: override these before build to change SPI pins. Defaults follow
+// common Uno pins, and typical VSPI pins for ESP32.
+#if !defined(SCK_PIN)
+#if defined(ARDUINO_ARCH_ESP32)
+#define SCK_PIN 18
+#define MISO_PIN 19
+#define MOSI_PIN 23
+#else
+#define SCK_PIN 13
+#define MISO_PIN 12
+#define MOSI_PIN 11
+#endif
+#endif
+
+using namespace protocentral;
 
 ads1293 ADS1293(DRDY_PIN, CS_PIN);
 
-bool drdyIntFlag = false;
+// Uncomment to enable debug register/sample dumps on startup and before streaming
+// #define ENABLE_DEBUG
 
-void drdyInterruptHndlr(){
-  //Serial.println("i");
-  drdyIntFlag = true;
+void setup()
+{
+	Serial.begin(115200);
+	// Start SPI appropriately for the platform. On ESP32 use the SCK/MISO/MOSI overload
+#if defined(ARDUINO_ARCH_ESP32)
+	ADS1293.begin(SCK_PIN, MISO_PIN, MOSI_PIN);
+#else
+	ADS1293.begin();
+#endif
+	// Configure device for 3-lead ECG
+
+	ADS1293.configureChannel1(FlexCh1Mode::Default);
+	ADS1293.configureChannel2(FlexCh2Mode::Default);
+	ADS1293.enableCommonModeDetection(CMDetMode::Enabled);
+	ADS1293.configureRLD(RLDMode::Default);
+	ADS1293.configureOscillator(OscMode::Default);
+	// Ensure the analog front-end is powered on so conversions produce valid data
+	ADS1293.configureAFEShutdown(AFEShutdownMode::AFE_On);
+	// Use the new high-level sampling-rate API and set default ODR to 100 SPS
+	ADS1293.setSamplingRate(Ads1293::SamplingRate::SPS_100);
+	ADS1293.configureDRDYSource(DRDYSource::Default);
+	ADS1293.configureChannelConfig(ChannelConfig::Default3Lead);
+	ADS1293.applyGlobalConfig(GlobalConfig::Start);
+
+#if defined(ENABLE_DEBUG)
+	// Dump ID, error status and a sample read for debugging wiring/SPI
+	ADS1293.dumpDebug(Serial);
+#endif
+
+#if defined(ENABLE_TEST_SIGNAL)
+	// enable positive test signal on all channels for validation
+	ADS1293.enableTestSignalAll(TestSignal::Positive);
+#endif
+
+	delay(10);
 }
 
-void enableInterruptPin(){
-//ToDo
-
- // pinMode(ADS1293.drdyPin, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(ADS1293.drdyPin), drdyInterruptHndlr, FALLING);
-}
-
-
-void setup() {
-
-  Serial.begin(9600);
-  SPI.begin();
-
-  ADS1293.ads1293Begin3LeadECG();
-  //enableInterruptPin();
-  delay(10);
-}
-
-void loop() {
-
-  //if (drdyIntFlag) {
-  if (digitalRead(ADS1293.drdyPin) == false){
-
-    drdyIntFlag = false;
-    int32_t ecg = ADS1293.getECGdata(1);
-
-    Serial.println(ecg);
-  }
+void loop()
+{
+	// check DRDY pin and read channel 1
+	if (digitalRead(DRDY_PIN) == LOW)
+	{
+		// Use the convenience overload that returns a Samples POD
+		auto samples = ADS1293.getECGData();
+		if (samples.ok)
+		{
+			// Print all three channels as CSV so the Arduino plotter or a host
+			// application can parse them easily: ch1,ch2,ch3
+			Serial.print(samples.ch1);
+			Serial.print(',');
+			Serial.print(samples.ch2);
+			Serial.print(',');
+			Serial.println(samples.ch3);
+		}
+	}
 }
