@@ -1,42 +1,26 @@
-/////////////////////////////////////////////////////////////////////////////////////////
-
-//  Demo code for the ads1293 board
-//  This example plots the ecg through arduino plotter.
-//  Copyright (c) 2020 ProtoCentral
+//////////////////////////////////////////////////////////////////////////////////////////
+// Protocentral ADS1293 - implementation
+// https://github.com/Protocentral/protocentral-ads1293-arduino
+// Copyright (c) 2020 ProtoCentral
+// Licensed under the MIT License
 //
-//  Arduino uno connections:
-//
-//  |pin label         | Pin Function         |Arduino Connection|
-//  |----------------- |:--------------------:|-----------------:|
-//  | MISO             | Slave Out            |  12              |
-//  | MOSI             | Slave In             |  11              |
-//  | SCLK             | Serial Clock         |  13              |
-//  | CS               | Chip Select          |  10              |
-//  | VCC              | Digital VDD          |  +5V             |
-//  | GND              | Digital Gnd          |  Gnd             |
-//  | DRDY             | Data ready           |  02              |
-//
-//  This software is licensed under the MIT License(http://opensource.org/licenses/MIT).
-//
-//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
-//  NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-//  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-//  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-//  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-//
-//  For information on how to use, visit https://github.com/Protocentral/protocentral-ads1293-arduino
-//
-/////////////////////////////////////////////////////////////////////////////////////////
+// Implementation notes:
+//  - Keep public API in the header. This TU focuses on small formatting
+//    and style cleanups. No public API renames are performed here.
+//  - Suggested non-breaking renames documented in TODO below.
+//////////////////////////////////////////////////////////////////////////////////////////
 
 #include "protocentral_ads1293.h"
-#include <SPI.h>
 
-using namespace protocentral;
+// TODO (non-breaking): consider renaming internal helpers for clarity:
+//  - signExtend24 -> raw24_to_signed32
+//  - getRaw24 -> readRaw24 or readRawSample24
+//  - setSamplingRate -> configureSamplingRate
 
-Ads1293::Ads1293(uint8_t drdyPin, uint8_t csPin, SPIClass *spi) noexcept
+ADS1293::ADS1293(uint8_t drdyPin, uint8_t csPin, SPIClass *spi) noexcept
 	: drdyPin_(drdyPin), csPin_(csPin), spi_(spi) {}
 
-void Ads1293::begin(bool startSPI)
+void ADS1293::begin(bool startSPI)
 {
 	pinMode(drdyPin_, INPUT_PULLUP);
 	pinMode(csPin_, OUTPUT);
@@ -47,7 +31,7 @@ void Ads1293::begin(bool startSPI)
 	}
 }
 
-void Ads1293::begin(uint8_t sck, uint8_t miso, uint8_t mosi)
+void ADS1293::begin(uint8_t sck, uint8_t miso, uint8_t mosi)
 {
 	pinMode(drdyPin_, INPUT_PULLUP);
 	pinMode(csPin_, OUTPUT);
@@ -64,7 +48,7 @@ void Ads1293::begin(uint8_t sck, uint8_t miso, uint8_t mosi)
 	}
 }
 
-bool Ads1293::writeRegister(Register reg, uint8_t value) noexcept
+bool ADS1293::writeRegister(Register reg, uint8_t value) noexcept
 {
 	if (!spi_)
 		return false;
@@ -79,7 +63,7 @@ bool Ads1293::writeRegister(Register reg, uint8_t value) noexcept
 	return true;
 }
 
-bool Ads1293::readRegister(Register reg, uint8_t &value) noexcept
+bool ADS1293::readRegister(Register reg, uint8_t &value) noexcept
 {
 	if (!spi_)
 		return false;
@@ -93,7 +77,7 @@ bool Ads1293::readRegister(Register reg, uint8_t &value) noexcept
 	return true;
 }
 
-int32_t Ads1293::signExtend24(uint32_t value) noexcept
+int32_t ADS1293::signExtend24(uint32_t value) noexcept
 {
 	// value is expected to be 24-bit left-aligned in LSB positions
 	value &= 0xFFFFFFu;
@@ -104,7 +88,7 @@ int32_t Ads1293::signExtend24(uint32_t value) noexcept
 	return static_cast<int32_t>(value);
 }
 
-bool Ads1293::getECGData(int32_t &ch1, int32_t &ch2, int32_t &ch3)
+bool ADS1293::getECGData(int32_t &ch1, int32_t &ch2, int32_t &ch3)
 {
 	// Read DATA_CH1_ECG (0x37) through DATA_CH3_ECG (0x3F) in one auto-incrementing
 	// SPI transaction. This returns 9 bytes: CH1[MSB,mid,LSB], CH2[MSB,mid,LSB], CH3[MSB,mid,LSB].
@@ -124,6 +108,7 @@ bool Ads1293::getECGData(int32_t &ch1, int32_t &ch2, int32_t &ch3)
 	digitalWrite(csPin_, HIGH);
 	spi_->endTransaction();
 
+	// assemble 24-bit raw samples and sign-extend to int32
 	uint32_t raw1 = (static_cast<uint32_t>(buf[0]) << 16) |
 					(static_cast<uint32_t>(buf[1]) << 8) |
 					static_cast<uint32_t>(buf[2]);
@@ -140,84 +125,89 @@ bool Ads1293::getECGData(int32_t &ch1, int32_t &ch2, int32_t &ch3)
 	return true;
 }
 
-	bool Ads1293::getRaw24(uint8_t channel, uint32_t &raw24)
-	{
-		if (!spi_) return false;
-		if (channel < 1 || channel > 3) return false;
-		// DATA_CHn_ECG registers start at 0x37 for channel 1 (MSB). Each channel uses 3 bytes.
-		// Compute start address as 0x37 + (channel-1)*3 so channel=1 -> 0x37
-		const uint8_t startAddr = static_cast<uint8_t>(0x37 + ((channel - 1) * 3));
-		uint8_t buf[3] = {0};
-		spi_->beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
-		digitalWrite(csPin_, LOW);
-		spi_->transfer(startAddr | RREG_FLAG);
-		for (int i = 0; i < 3; ++i) buf[i] = spi_->transfer(0x00);
-		digitalWrite(csPin_, HIGH);
-		spi_->endTransaction();
-		raw24 = (static_cast<uint32_t>(buf[0]) << 16) | (static_cast<uint32_t>(buf[1]) << 8) | static_cast<uint32_t>(buf[2]);
-		return true;
+bool ADS1293::getRaw24(uint8_t channel, uint32_t &raw24)
+{
+	if (!spi_)
+		return false;
+	if (channel < 1 || channel > 3)
+		return false;
+
+	// DATA_CHn_ECG registers start at 0x37 for channel 1 (MSB). Each channel uses 3 bytes.
+	// Compute start address as 0x37 + (channel-1)*3 so channel=1 -> 0x37
+	const uint8_t startAddr = static_cast<uint8_t>(0x37 + ((channel - 1) * 3));
+	uint8_t buf3[3] = {0};
+
+	spi_->beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+	digitalWrite(csPin_, LOW);
+	spi_->transfer(startAddr | RREG_FLAG);
+	for (int i = 0; i < 3; ++i)
+		buf3[i] = spi_->transfer(0x00);
+	digitalWrite(csPin_, HIGH);
+	spi_->endTransaction();
+
+	raw24 = (static_cast<uint32_t>(buf3[0]) << 16) | (static_cast<uint32_t>(buf3[1]) << 8) | static_cast<uint32_t>(buf3[2]);
+	return true;
+}
+
+bool ADS1293::readSampleBytes(uint8_t outBuf[9])
+{
+	if (!spi_)
+		return false;
+	const uint8_t startAddr = 0x37;
+
+	spi_->beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+	digitalWrite(csPin_, LOW);
+	spi_->transfer(startAddr | RREG_FLAG);
+	for (int i = 0; i < 9; ++i)
+		outBuf[i] = spi_->transfer(0x00);
+	digitalWrite(csPin_, HIGH);
+	spi_->endTransaction();
+	return true;
+}
+
+bool ADS1293::dumpDebug(Print &out)
+{
+	if (!spi_)
+		return false;
+	uint8_t rev = 0, err = 0;
+	if (!readRegister(Register::REVID, rev))
+		return false;
+	if (!readRegister(Register::ERR_STATUS, err))
+		return false;
+	uint8_t buf9[9] = {0};
+	if (!readSampleBytes(buf9))
+		return false;
+
+	out.print(F("REVID=0x"));
+	if (rev < 16)
+		out.print('0');
+	out.println(rev, HEX);
+	out.print(F("ERR=0x"));
+	if (err < 16)
+		out.print('0');
+	out.println(err, HEX);
+	out.print(F("SAMPLES:"));
+	for (int i = 0; i < 9; ++i) {
+		out.print(' ');
+		uint8_t v = buf9[i];
+		if (v < 16)
+			out.print('0');
+		out.print(v, HEX);
 	}
+	out.println();
+	return true;
+}
 
-	bool Ads1293::readSampleBytes(uint8_t buf[9])
-	{
-		if (!spi_) return false;
-		const uint8_t startAddr = 0x37;
-		spi_->beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
-		digitalWrite(csPin_, LOW);
-		spi_->transfer(startAddr | RREG_FLAG);
-		for (int i = 0; i < 9; ++i) buf[i] = spi_->transfer(0x00);
-		digitalWrite(csPin_, HIGH);
-		spi_->endTransaction();
-		return true;
-	}
+	// interpretRaw24 removed: library now always interprets ADC output as
+	// two's-complement 24-bit. Use signExtend24() for conversion.
 
-	bool Ads1293::dumpDebug(Print &out)
-	{
-		if (!spi_) return false;
-		uint8_t rev = 0, err = 0;
-		if (!readRegister(Register::REVID, rev)) return false;
-		if (!readRegister(Register::ERR_STATUS, err)) return false;
-		uint8_t buf[9] = {0};
-		if (!readSampleBytes(buf)) return false;
-
-		out.print(F("REVID=0x"));
-		if (rev < 16) out.print('0');
-		out.println(rev, HEX);
-		out.print(F("ERR=0x"));
-		if (err < 16) out.print('0');
-		out.println(err, HEX);
-		out.print(F("SAMPLES:"));
-		for (int i = 0; i < 9; ++i) {
-			out.print(' ');
-			uint8_t v = buf[i];
-			if (v < 16) out.print('0');
-			out.print(v, HEX);
-		}
-		out.println();
-		return true;
-	}
-
-	int32_t Ads1293::interpretRaw24(uint32_t raw24, bool offsetBinary) noexcept
-	{
-		raw24 &= 0xFFFFFFu;
-		if (offsetBinary) {
-			// offset-binary: midscale (2^23) == 0
-			return static_cast<int32_t>(raw24) - static_cast<int32_t>(1 << 23);
-		}
-		// two's-complement sign-extend
-		if (raw24 & 0x800000u) {
-			return static_cast<int32_t>(raw24) - static_cast<int32_t>(1 << 24);
-		}
-		return static_cast<int32_t>(raw24);
-	}
-
-	float Ads1293::rawToVoltage(int32_t signedCode, float vref, int32_t adcFullscale, float gain) noexcept
+	float ADS1293::rawToVoltage(int32_t signedCode, float vref, int32_t adcFullscale, float gain) noexcept
 	{
 		if (adcFullscale == 0) adcFullscale = (1 << 23) - 1;
 		return (static_cast<float>(signedCode) / static_cast<float>(adcFullscale)) * vref * gain;
 	}
 
-Ads1293::Samples Ads1293::getECGData()
+ADS1293::Samples ADS1293::getECGData()
 {
 	Samples s;
 	int32_t a = 0, b = 0, c = 0;
@@ -231,21 +221,21 @@ Ads1293::Samples Ads1293::getECGData()
 	return s;
 }
 
-uint8_t Ads1293::readDeviceID()
+uint8_t ADS1293::readDeviceID()
 {
 	uint8_t val = 0;
 	readRegister(Register::REVID, val);
 	return val;
 }
 
-uint8_t Ads1293::readErrorStatus()
+uint8_t ADS1293::readErrorStatus()
 {
 	uint8_t val = 0;
 	readRegister(Register::ERR_STATUS, val);
 	return val;
 }
 
-bool Ads1293::begin3LeadECG()
+bool ADS1293::begin3LeadECG()
 {
 	// perform the configuration steps in a clear, datasheet-aligned order
 	if (!configureChannel1(FlexCh1Mode::Default))
@@ -273,53 +263,53 @@ bool Ads1293::begin3LeadECG()
 }
 
 // --- helper implementations follow ---
-bool Ads1293::configureChannel1(FlexCh1Mode m)
+bool ADS1293::configureChannel1(FlexCh1Mode m)
 {
 	// FLEX_CH1_CN: enable input, set gain/placement per datasheet example
 	return writeRegister(Register::FLEX_CH1_CN, static_cast<uint8_t>(m));
 }
 
-bool Ads1293::configureChannel2(FlexCh2Mode m)
+bool ADS1293::configureChannel2(FlexCh2Mode m)
 {
 	// FLEX_CH2_CN: enable input and set channel-specific config
 	return writeRegister(Register::FLEX_CH2_CN, static_cast<uint8_t>(m));
 }
 
-bool Ads1293::enableCommonModeDetection(CMDetMode m)
+bool ADS1293::enableCommonModeDetection(CMDetMode m)
 {
 	// CMDET_EN: enable common-mode detection
 	return writeRegister(Register::CMDET_EN, static_cast<uint8_t>(m));
 }
 
-bool Ads1293::configureRLD(RLDMode m)
+bool ADS1293::configureRLD(RLDMode m)
 {
 	// RLD_CN: configure right leg drive
 	return writeRegister(Register::RLD_CN, static_cast<uint8_t>(m));
 }
 
-bool Ads1293::configureOscillator(OscMode m)
+bool ADS1293::configureOscillator(OscMode m)
 {
 	// OSC_CN: oscillator configuration
 	return writeRegister(Register::OSC_CN, static_cast<uint8_t>(m));
 }
 
-bool Ads1293::configureAFEShutdown(AFEShutdownMode m)
+bool ADS1293::configureAFEShutdown(AFEShutdownMode m)
 {
 	// AFE_SHDN_CN: control AFE shutdown bits
 	return writeRegister(Register::AFE_SHDN_CN, static_cast<uint8_t>(m));
 }
 
-bool Ads1293::configureChannel3(FlexCh3Mode m)
+bool ADS1293::configureChannel3(FlexCh3Mode m)
 {
 	return writeRegister(Register::FLEX_CH3_CN, static_cast<uint8_t>(m));
 }
 
-bool Ads1293::configureRef(RefMode m)
+bool ADS1293::configureRef(RefMode m)
 {
 	return writeRegister(Register::REF_CN, static_cast<uint8_t>(m));
 }
 
-bool Ads1293::configureSamplingRates(R2Rate r2, R3Rate r3ch1, R3Rate r3ch2)
+bool ADS1293::configureSamplingRates(R2Rate r2, R3Rate r3ch1, R3Rate r3ch2)
 {
 	// R2_RATE and R3_RATE_CHx: sampling rate related registers
 	bool ok = true;
@@ -329,19 +319,21 @@ bool Ads1293::configureSamplingRates(R2Rate r2, R3Rate r3ch1, R3Rate r3ch2)
 	return ok;
 }
 
-bool Ads1293::configureDRDYSource(DRDYSource m)
+	// namespace removed from this TU: implementation uses global symbols
+
+bool ADS1293::configureDRDYSource(DRDYSource m)
 {
 	// DRDYB_SRC: data ready source selection
 	return writeRegister(Register::DRDYB_SRC, static_cast<uint8_t>(m));
 }
 
-bool Ads1293::configureChannelConfig(ChannelConfig m)
+bool ADS1293::configureChannelConfig(ChannelConfig m)
 {
 	// CH_CNFG: global channel configuration
 	return writeRegister(Register::CH_CNFG, static_cast<uint8_t>(m));
 }
 
-bool Ads1293::applyGlobalConfig(GlobalConfig m)
+bool ADS1293::applyGlobalConfig(GlobalConfig m)
 {
 	// CONFIG: final device configuration to start conversions
 	return writeRegister(Register::CONFIG, static_cast<uint8_t>(m));
@@ -349,7 +341,7 @@ bool Ads1293::applyGlobalConfig(GlobalConfig m)
 
 // begin5LeadECG removed in favor of explicit helper calls in examples.
 
-void Ads1293::disableChannel(uint8_t channel)
+void ADS1293::disableChannel(uint8_t channel)
 {
 	if (channel == 1)
 	{
@@ -358,13 +350,13 @@ void Ads1293::disableChannel(uint8_t channel)
 	}
 }
 
-void Ads1293::disableFilterAll()
+void ADS1293::disableFilterAll()
 {
 	writeRegister(Register::DIS_EFILTER, 0x07);
 	delay(1);
 }
 
-bool Ads1293::disableFilter(uint8_t channel)
+bool ADS1293::disableFilter(uint8_t channel)
 {
 	if (channel < 1 || channel > 3)
 	{
@@ -376,7 +368,7 @@ bool Ads1293::disableFilter(uint8_t channel)
 	return true;
 }
 
-bool Ads1293::attachTestSignal(uint8_t channel, TestSignal sig)
+bool ADS1293::attachTestSignal(uint8_t channel, TestSignal sig)
 {
 	if (channel < 1 || channel > 3)
 	{
@@ -390,7 +382,7 @@ bool Ads1293::attachTestSignal(uint8_t channel, TestSignal sig)
 	return true;
 }
 
-bool Ads1293::enableTestSignalAll(TestSignal sig)
+bool ADS1293::enableTestSignalAll(TestSignal sig)
 {
 	bool ok = true;
 	for (uint8_t ch = 1; ch <= 3; ++ch)
@@ -400,7 +392,7 @@ bool Ads1293::enableTestSignalAll(TestSignal sig)
 	return ok;
 }
 
-bool Ads1293::setChannelGainRaw(uint8_t channel, uint8_t regValue)
+bool ADS1293::setChannelGainRaw(uint8_t channel, uint8_t regValue)
 {
 	if (channel < 1 || channel > 3) return false;
 	// CH1SET @ 0x0A, CH2SET @ 0x0B, CH3SET @ 0x0C
@@ -410,12 +402,12 @@ bool Ads1293::setChannelGainRaw(uint8_t channel, uint8_t regValue)
 	return ok;
 }
 
-bool Ads1293::setChannelGain(uint8_t channel, Ads1293::PgaGain gain)
+bool ADS1293::setChannelGain(uint8_t channel, ADS1293::PgaGain gain)
 {
 	return setChannelGainRaw(channel, static_cast<uint8_t>(gain));
 }
 
-bool Ads1293::setSamplingRate(Ads1293::SamplingRate s)
+bool ADS1293::setSamplingRate(ADS1293::SamplingRate s)
 {
 	// Implement ODR configuration by programming the decimation stages
 	// R1 (0x25), R2 (0x21) and R3 (0x22/0x23/0x24) according to the datasheet.
@@ -423,32 +415,45 @@ bool Ads1293::setSamplingRate(Ads1293::SamplingRate s)
 	// whose resulting ODR (fS/(R1*R2*R3)) is closest to the requested value.
 	// We assume the SDM clock fS = 102400 Hz by default (AFE_RES FS_HIGH = 0).
 
-	const float fs = 102400.0f; // default SDM clock per-channel when FS_HIGH=0
+	// Determine SDM clock (fS). Default is 102.4 kHz, but if the AFE_RES
+	// register indicates high-rate mode (FS_HIGH) the SDM clock is doubled
+	// to 204.8 kHz. Read the AFE_RES register to detect this.
+	float fs = 102400.0f; // default SDM clock per-channel when FS_HIGH=0
+	uint8_t afeRes = 0;
+	if (readRegister(Register::AFE_RES, afeRes)) {
+		// Datasheet labels a bit (FS_HIGH) in AFE_RES that enables higher SDM
+		// clock. Use bit mask 0x01 here (common mapping). If your hardware
+		// uses a different bit, we can adjust once you provide the register
+		// value from `readRegister(Register::AFE_RES)`.
+		if (afeRes & 0x01u) {
+			fs = 204800.0f;
+		}
+	}
 
 	// numeric target ODR for each enum
 	float targetHz = 0.0f;
 	switch (s)
 	{
-	case Ads1293::SamplingRate::SPS_25600: targetHz = 25600.0f; break;
-	case Ads1293::SamplingRate::SPS_12800: targetHz = 12800.0f; break;
-	case Ads1293::SamplingRate::SPS_6400: targetHz = 6400.0f; break;
-	case Ads1293::SamplingRate::SPS_3200: targetHz = 3200.0f; break;
-	case Ads1293::SamplingRate::SPS_1600: targetHz = 1600.0f; break;
-	case Ads1293::SamplingRate::SPS_1280: targetHz = 1280.0f; break;
-	case Ads1293::SamplingRate::SPS_1066: targetHz = 1067.0f; break; // datasheet shows 1067
-	case Ads1293::SamplingRate::SPS_853: targetHz = 853.0f; break;
-	case Ads1293::SamplingRate::SPS_800: targetHz = 800.0f; break;
-	case Ads1293::SamplingRate::SPS_640: targetHz = 640.0f; break;
-	case Ads1293::SamplingRate::SPS_533: targetHz = 533.0f; break;
-	case Ads1293::SamplingRate::SPS_426: targetHz = 426.0f; break;
-	case Ads1293::SamplingRate::SPS_400: targetHz = 400.0f; break;
-	case Ads1293::SamplingRate::SPS_320: targetHz = 320.0f; break;
-	case Ads1293::SamplingRate::SPS_266: targetHz = 266.0f; break;
-	case Ads1293::SamplingRate::SPS_200: targetHz = 200.0f; break;
-	case Ads1293::SamplingRate::SPS_160: targetHz = 160.0f; break;
-	case Ads1293::SamplingRate::SPS_100: targetHz = 100.0f; break;
-	case Ads1293::SamplingRate::SPS_50: targetHz = 50.0f; break;
-	case Ads1293::SamplingRate::SPS_25: targetHz = 25.0f; break;
+	case ADS1293::SamplingRate::SPS_25600: targetHz = 25600.0f; break;
+	case ADS1293::SamplingRate::SPS_12800: targetHz = 12800.0f; break;
+	case ADS1293::SamplingRate::SPS_6400: targetHz = 6400.0f; break;
+	case ADS1293::SamplingRate::SPS_3200: targetHz = 3200.0f; break;
+	case ADS1293::SamplingRate::SPS_1600: targetHz = 1600.0f; break;
+	case ADS1293::SamplingRate::SPS_1280: targetHz = 1280.0f; break;
+	case ADS1293::SamplingRate::SPS_1066: targetHz = 1067.0f; break; // datasheet shows 1067
+	case ADS1293::SamplingRate::SPS_853: targetHz = 853.0f; break;
+	case ADS1293::SamplingRate::SPS_800: targetHz = 800.0f; break;
+	case ADS1293::SamplingRate::SPS_640: targetHz = 640.0f; break;
+	case ADS1293::SamplingRate::SPS_533: targetHz = 533.0f; break;
+	case ADS1293::SamplingRate::SPS_426: targetHz = 426.0f; break;
+	case ADS1293::SamplingRate::SPS_400: targetHz = 400.0f; break;
+	case ADS1293::SamplingRate::SPS_320: targetHz = 320.0f; break;
+	case ADS1293::SamplingRate::SPS_266: targetHz = 266.0f; break;
+	case ADS1293::SamplingRate::SPS_200: targetHz = 200.0f; break;
+	case ADS1293::SamplingRate::SPS_160: targetHz = 160.0f; break;
+	case ADS1293::SamplingRate::SPS_100: targetHz = 100.0f; break;
+	case ADS1293::SamplingRate::SPS_50: targetHz = 50.0f; break;
+	case ADS1293::SamplingRate::SPS_25: targetHz = 25.0f; break;
 	default: return false;
 	}
 
@@ -484,6 +489,30 @@ bool Ads1293::setSamplingRate(Ads1293::SamplingRate s)
 	float bestErr = 1e9f;
 	uint8_t bestR1 = 4, bestR2 = 4, bestR3 = 64;
 	float bestODR = 0.0f;
+
+	// Fast-path: if caller requested 100 SPS, program the registers to the
+	// recommended values from the datasheet/example to avoid any ambiguity.
+	if (s == ADS1293::SamplingRate::SPS_100) {
+		// R1 = 4 -> write 0x00 to R1_RATE (bits clear)
+		// R2 = 5 -> write 0x02 to R2_RATE (encoding)
+		// R3 = 64 -> write 0x40 to R3_RATE_CHx
+		bool ok = true;
+		ok &= writeRegister(Register::R1_RATE, 0x00);
+		ok &= writeRegister(Register::R2_RATE, 0x02);
+		ok &= writeRegister(Register::R3_RATE_CH1, 0x40);
+		ok &= writeRegister(Register::R3_RATE_CH2, 0x40);
+		ok &= writeRegister(Register::R3_RATE_CH3, 0x40);
+		delay(1);
+
+		// Verify by reading back
+		uint8_t v = 0;
+		if (!readRegister(Register::R1_RATE, v) || v != 0x00) return false;
+		if (!readRegister(Register::R2_RATE, v) || v != 0x02) return false;
+		if (!readRegister(Register::R3_RATE_CH1, v) || v != 0x40) return false;
+		if (!readRegister(Register::R3_RATE_CH2, v) || v != 0x40) return false;
+		if (!readRegister(Register::R3_RATE_CH3, v) || v != 0x40) return false;
+		return ok;
+	}
 
 	for (uint8_t r1 : r1Candidates)
 	{

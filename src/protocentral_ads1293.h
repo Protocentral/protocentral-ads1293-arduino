@@ -1,6 +1,6 @@
-//////////////////////////////////////////////////////////////////////////////////////////
-//
-//  Demo code for the ads1293 board
+/////////////////////////////////////////////////////////////////////////////////////////
+
+//  Demo code for the ADS1293 board
 //
 //  Copyright (c) 2020 ProtoCentral
 //
@@ -34,7 +34,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 
-namespace protocentral {
+// (no namespace) public API placed in the global namespace for compatibility
 
 // Commands used to form read/write transfer bytes.
 constexpr uint8_t WREG_MASK = 0x7F; // used to mask address for write
@@ -101,10 +101,10 @@ enum class TestSignal : uint8_t {
   Zero = 0x03
 };
 
-class Ads1293 {
+class ADS1293 {
 public:
   // Construct with DRDY and CS pins. Use begin() to initialize hardware.
-  explicit Ads1293(uint8_t drdyPin, uint8_t csPin, SPIClass *spi = &SPI) noexcept;
+  explicit ADS1293(uint8_t drdyPin, uint8_t csPin, SPIClass *spi = &SPI) noexcept;
 
   // Initialize pins and optionally start SPI. Must be called in setup().
   // Pass startSPI=false on platforms that need custom SPI pin setup (e.g. some ESP32 configs).
@@ -148,10 +148,10 @@ public:
   // (e.g., `Serial`). This prints REVID, ERR_STATUS and the 9 sample bytes in hex.
   bool dumpDebug(Print &out);
 
-  // Interpret a 24-bit raw value as a signed code. If offsetBinary is true,
-  // treats raw as offset-binary (midscale == 0). Otherwise interprets as
-  // two's-complement 24-bit and sign-extends to 32-bit.
-  static int32_t interpretRaw24(uint32_t raw24, bool offsetBinary = false) noexcept;
+  // Convert a 24-bit unsigned raw value to signed int32 using two's-complement
+  // sign-extension. This library always interprets ADC output as two's-complement
+  // 24-bit by default.
+  static int32_t signExtend24(uint32_t raw24) noexcept;
 
   // Convert a signed code to a voltage (V). adcFullscale defaults to 2^23-1.
   static float rawToVoltage(int32_t signedCode, float vref = 2.4f, int32_t adcFullscale = ((1 << 23) - 1), float gain = 1.0f) noexcept;
@@ -246,10 +246,13 @@ private:
   bool readRegister(Register reg, uint8_t &value) noexcept;
 
   // helper to convert a raw 24-bit unsigned value into signed int32_t
-  static int32_t signExtend24(uint32_t value) noexcept;
+  // (declaration above is public; no duplicate private declaration needed)
 };
 
 // Backwards compatibility alias for existing sketches that used lowercase class name.
-using ads1293 = Ads1293;
+using ads1293 = ADS1293;
 
-} // namespace protocentral
+// PgaGain and SamplingRate are nested inside ADS1293; provide simple aliases
+// for convenience (left in global scope).
+using PgaGain = ADS1293::PgaGain;
+using SamplingRate = ADS1293::SamplingRate;
