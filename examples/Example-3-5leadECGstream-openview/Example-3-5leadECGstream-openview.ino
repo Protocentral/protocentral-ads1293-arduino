@@ -3,7 +3,7 @@
 //  Protocentral ADS1293 Arduino example — 5-lead ECG (OpenView packet format)
 //
 //  Author: Ashwin Whitchurch, Protocentral Electronics
-//  SPDX-FileCopyrightText: 2020 Protocentral Electronics
+//  SPDX-FileCopyrightText: 2025 Protocentral Electronics
 //  SPDX-License-Identifier: MIT
 //
 //  Streams ECG samples in the OpenView packet format. See the OpenView
@@ -13,7 +13,7 @@
 //  Hardware connections (Arduino UNO / ESP32 VSPI):
 //
 //  | Signal | Arduino UNO | ESP32 (VSPI default) |
-//  |-------:|:------------:|:--------------------:|
+//  |-------:|:-----------:|:--------------------:|
 //  | MISO   | 12          | 19                   |
 //  | MOSI   | 11          | 23                   |
 //  | SCLK   | 13          | 18                   |

@@ -3,7 +3,7 @@
 //  Protocentral ADS1293 Arduino example — 5-lead ECG (Arduino Plotter)
 //
 //  Author: Ashwin Whitchurch, Protocentral Electronics
-//  SPDX-FileCopyrightText: 2020 Protocentral Electronics
+//  SPDX-FileCopyrightText: 2025 Protocentral Electronics
 //  SPDX-License-Identifier: MIT
 //
 //  This example streams ECG samples to the Arduino IDE Plotter.
@@ -11,7 +11,7 @@
 //  Hardware connections (Arduino UNO / ESP32 VSPI):
 //
 //  | Signal | Arduino UNO | ESP32 (VSPI default) |
-//  |-------:|:------------:|:--------------------:|
+//  |-------:|:-----------:|:--------------------:|
 //  | MISO   | 12          | 19                   |
 //  | MOSI   | 11          | 23                   |
 //  | SCLK   | 13          | 18                   |
@@ -64,11 +64,11 @@ void setup()
 	ADS1293.configureRef(RefMode::Default);
 	ADS1293.configureAFEShutdown(AFEShutdownMode::AFE_On);
 
-		ADS1293.setChannelGain(1, ADS1293::PgaGain::G8);
-		ADS1293.setChannelGain(2, ADS1293::PgaGain::G8);
-		ADS1293.setChannelGain(3, ADS1293::PgaGain::G8);
+	ADS1293.setChannelGain(1, ADS1293::PgaGain::G8);
+	ADS1293.setChannelGain(2, ADS1293::PgaGain::G8);
+	ADS1293.setChannelGain(3, ADS1293::PgaGain::G8);
 
-		ADS1293.setSamplingRate(ADS1293::SamplingRate::SPS_100);
+	ADS1293.setSamplingRate(ADS1293::SamplingRate::SPS_100);
 	ADS1293.configureDRDYSource(DRDYSource::Default);
 	ADS1293.configureChannelConfig(ChannelConfig::Default5Lead);
 	ADS1293.applyGlobalConfig(GlobalConfig::Start);
@@ -79,11 +79,9 @@ void loop()
 {
 	if (digitalRead(DRDY_PIN) == LOW)
 	{
-
 		auto samples = ADS1293.getECGData();
 		if (samples.ok)
 		{
-
 			Serial.print(samples.ch1);
 			Serial.print(',');
 			Serial.print(samples.ch2);
@@ -91,5 +89,5 @@ void loop()
 			Serial.println(samples.ch3);
 		}
 	}
+	//delay(10);
 }
-
