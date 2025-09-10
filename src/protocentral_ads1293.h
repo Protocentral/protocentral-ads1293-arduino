@@ -209,27 +209,16 @@ public:
   // ECG channels. If you change the AFE_RES (FS_HIGH) or R1_RATE, the resulting
   // ODR will change.
   enum class SamplingRate : uint8_t {
-  // Added high-rate DRATE options (DR[3:0] mapping)
-  SPS_25600, // DR = 0x00 -> 25.6 kSPS
-  SPS_12800, // DR = 0x01 -> 12.8 kSPS
-  SPS_6400,  // DR = 0x02 -> 6.4 kSPS
-  SPS_3200,  // DR = 0x03 -> 3.2 kSPS
-    SPS_1600,
-    SPS_1280,
-    SPS_1066,
-    SPS_853,
-    SPS_800,
-    SPS_640,
-    SPS_533,
-    SPS_426,
-    SPS_400,
-    SPS_320,
-    SPS_266,
-    SPS_200,
-    SPS_160,
-    SPS_100,
-    SPS_50,
-    SPS_25
+    // Only include output rates that can be produced with R1=4, R2=4 and
+    // R3 in {4,6,8,12,16,32,64,128} (ODR = 102400 / (4*4*R3) = 6400 / R3)
+    SPS_1600, // R3=4
+    SPS_1067, // R3=6 (~1066.667)
+    SPS_800,  // R3=8
+    SPS_533,  // R3=12 (~533.333)
+    SPS_400,  // R3=16
+    SPS_200,  // R3=32
+    SPS_100,  // R3=64
+    SPS_50    // R3=128
   };
 
   // Configure R2/R3 rate registers for the requested output data rate (ODR).

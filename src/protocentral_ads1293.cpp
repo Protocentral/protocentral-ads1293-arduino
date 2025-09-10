@@ -430,39 +430,26 @@ bool ADS1293::setSamplingRate(ADS1293::SamplingRate s)
 		}
 	}
 
-	// numeric target ODR for each enum
+	// numeric target ODR for each supported enum (R1=4,R2=4; vary R3)
 	float targetHz = 0.0f;
 	switch (s)
 	{
-	case ADS1293::SamplingRate::SPS_25600: targetHz = 25600.0f; break;
-	case ADS1293::SamplingRate::SPS_12800: targetHz = 12800.0f; break;
-	case ADS1293::SamplingRate::SPS_6400: targetHz = 6400.0f; break;
-	case ADS1293::SamplingRate::SPS_3200: targetHz = 3200.0f; break;
-	case ADS1293::SamplingRate::SPS_1600: targetHz = 1600.0f; break;
-	case ADS1293::SamplingRate::SPS_1280: targetHz = 1280.0f; break;
-	case ADS1293::SamplingRate::SPS_1066: targetHz = 1067.0f; break; // datasheet shows 1067
-	case ADS1293::SamplingRate::SPS_853: targetHz = 853.0f; break;
-	case ADS1293::SamplingRate::SPS_800: targetHz = 800.0f; break;
-	case ADS1293::SamplingRate::SPS_640: targetHz = 640.0f; break;
-	case ADS1293::SamplingRate::SPS_533: targetHz = 533.0f; break;
-	case ADS1293::SamplingRate::SPS_426: targetHz = 426.0f; break;
-	case ADS1293::SamplingRate::SPS_400: targetHz = 400.0f; break;
-	case ADS1293::SamplingRate::SPS_320: targetHz = 320.0f; break;
-	case ADS1293::SamplingRate::SPS_266: targetHz = 266.0f; break;
-	case ADS1293::SamplingRate::SPS_200: targetHz = 200.0f; break;
-	case ADS1293::SamplingRate::SPS_160: targetHz = 160.0f; break;
-	case ADS1293::SamplingRate::SPS_100: targetHz = 100.0f; break;
-	case ADS1293::SamplingRate::SPS_50: targetHz = 50.0f; break;
-	case ADS1293::SamplingRate::SPS_25: targetHz = 25.0f; break;
+	case ADS1293::SamplingRate::SPS_1600: targetHz = 1600.0f; break;         // R3=4
+	case ADS1293::SamplingRate::SPS_1067: targetHz = 1066.6667f; break;    // R3=6
+	case ADS1293::SamplingRate::SPS_800:  targetHz = 800.0f; break;         // R3=8
+	case ADS1293::SamplingRate::SPS_533:  targetHz = 533.3333f; break;      // R3=12
+	case ADS1293::SamplingRate::SPS_400:  targetHz = 400.0f; break;         // R3=16
+	case ADS1293::SamplingRate::SPS_200:  targetHz = 200.0f; break;         // R3=32
+	case ADS1293::SamplingRate::SPS_100:  targetHz = 100.0f; break;         // R3=64
+	case ADS1293::SamplingRate::SPS_50:   targetHz = 50.0f; break;          // R3=128
 	default: return false;
 	}
 
-	// Allowed decimation values per datasheet
-	const uint8_t r1Candidates[] = {4, 2}; // prefer standard pace (4) then double pace (2)
-	const uint8_t r2Candidates[] = {4, 5, 6, 8};
+	// Fix R1=4 and R2=4 per requirement. Only vary R3 from allowed candidates.
+	const uint8_t r1 = 4;
+	const uint8_t r2 = 4;
 	const uint8_t r3Candidates[] = {4, 6, 8, 12, 16, 32, 64, 128};
 
-	// Mapping from value -> register code
 	auto r2Code = [](uint8_t v) -> uint8_t {
 		switch (v) {
 		case 4: return 0x01;
@@ -486,61 +473,22 @@ bool ADS1293::setSamplingRate(ADS1293::SamplingRate s)
 		}
 	};
 
+	// Choose the R3 candidate that best matches targetHz with R1=4,R2=4
+	uint8_t chosenR3 = r3Candidates[0];
 	float bestErr = 1e9f;
-	uint8_t bestR1 = 4, bestR2 = 4, bestR3 = 64;
-	float bestODR = 0.0f;
-
-	// Fast-path: if caller requested 100 SPS, program the registers to the
-	// recommended values from the datasheet/example to avoid any ambiguity.
-	if (s == ADS1293::SamplingRate::SPS_100) {
-		// R1 = 4 -> write 0x00 to R1_RATE (bits clear)
-		// R2 = 5 -> write 0x02 to R2_RATE (encoding)
-		// R3 = 64 -> write 0x40 to R3_RATE_CHx
-		bool ok = true;
-		ok &= writeRegister(Register::R1_RATE, 0x00);
-		ok &= writeRegister(Register::R2_RATE, 0x02);
-		ok &= writeRegister(Register::R3_RATE_CH1, 0x40);
-		ok &= writeRegister(Register::R3_RATE_CH2, 0x40);
-		ok &= writeRegister(Register::R3_RATE_CH3, 0x40);
-		delay(1);
-
-		// Verify by reading back
-		uint8_t v = 0;
-		if (!readRegister(Register::R1_RATE, v) || v != 0x00) return false;
-		if (!readRegister(Register::R2_RATE, v) || v != 0x02) return false;
-		if (!readRegister(Register::R3_RATE_CH1, v) || v != 0x40) return false;
-		if (!readRegister(Register::R3_RATE_CH2, v) || v != 0x40) return false;
-		if (!readRegister(Register::R3_RATE_CH3, v) || v != 0x40) return false;
-		return ok;
-	}
-
-	for (uint8_t r1 : r1Candidates)
-	{
-		for (uint8_t r2 : r2Candidates)
-		{
-			for (uint8_t r3 : r3Candidates)
-			{
-				float odr = fs / (static_cast<float>(r1) * r2 * r3);
-				float err = fabsf(odr - targetHz);
-				if (err < bestErr)
-				{
-					bestErr = err;
-					bestR1 = r1;
-					bestR2 = r2;
-					bestR3 = r3;
-					bestODR = odr;
-				}
-				if (err == 0.0f) break;
-			}
-			if (bestErr == 0.0f) break;
+	for (uint8_t r3 : r3Candidates) {
+		float odr = fs / (static_cast<float>(r1) * static_cast<float>(r2) * static_cast<float>(r3));
+		float err = fabsf(odr - targetHz);
+		if (err < bestErr) {
+			bestErr = err;
+			chosenR3 = r3;
 		}
-		if (bestErr == 0.0f) break;
+		if (err == 0.0f) break;
 	}
 
-	// Program R1, R2 and R3 registers. R1_RATE bits select 2x pace when set.
-	uint8_t r1Reg = (bestR1 == 2) ? 0x07 : 0x00; // bits [2:0] map channels 3..1
-	uint8_t r2Reg = r2Code(bestR2);
-	uint8_t r3Reg = r3Code(bestR3);
+	uint8_t r1Reg = 0x00; // R1=4 -> bits cleared
+	uint8_t r2Reg = r2Code(r2); // r2=4 -> 0x01
+	uint8_t r3Reg = r3Code(chosenR3);
 
 	bool ok = true;
 	ok &= writeRegister(Register::R1_RATE, r1Reg);
@@ -549,6 +497,13 @@ bool ADS1293::setSamplingRate(ADS1293::SamplingRate s)
 	ok &= writeRegister(Register::R3_RATE_CH2, r3Reg);
 	ok &= writeRegister(Register::R3_RATE_CH3, r3Reg);
 	delay(1);
+
+	// Verify writes by reading back at least R2 and R3
+	uint8_t verify = 0;
+	if (!readRegister(Register::R2_RATE, verify)) return false;
+	if (verify != r2Reg) return false;
+	if (!readRegister(Register::R3_RATE_CH1, verify)) return false;
+	if (verify != r3Reg) return false;
 
 	return ok;
 }

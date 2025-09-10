@@ -89,5 +89,5 @@ void loop()
 			Serial.println(samples.ch3);
 		}
 	}
-	//delay(10);
+	delay(15);
 }
