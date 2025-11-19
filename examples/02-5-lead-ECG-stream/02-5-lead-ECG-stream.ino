@@ -62,13 +62,13 @@ void setup()
 	ADS1293.enableCommonModeDetection(CMDetMode::Enabled);
 	ADS1293.configureRLD(RLDMode::Default);
 	ADS1293.configureRef(RefMode::Default);
+	ADS1293.configureOscillator(OscMode::Default);
 	ADS1293.configureAFEShutdown(AFEShutdownMode::AFE_On);
 
+	ADS1293.setSamplingRate(ADS1293::SamplingRate::SPS_100);
 	ADS1293.setChannelGain(1, ADS1293::PgaGain::G8);
 	ADS1293.setChannelGain(2, ADS1293::PgaGain::G8);
 	ADS1293.setChannelGain(3, ADS1293::PgaGain::G8);
-
-	ADS1293.setSamplingRate(ADS1293::SamplingRate::SPS_100);
 	ADS1293.configureDRDYSource(DRDYSource::Default);
 	ADS1293.configureChannelConfig(ChannelConfig::Default5Lead);
 	ADS1293.applyGlobalConfig(GlobalConfig::Start);
