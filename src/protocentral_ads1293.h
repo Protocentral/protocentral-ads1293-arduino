@@ -1,32 +1,33 @@
-/////////////////////////////////////////////////////////////////////////////////////////
-
-//  Demo code for the ADS1293 board
+//////////////////////////////////////////////////////////////////////////////////////////
 //
-//  Copyright (c) 2020 ProtoCentral
+//  Protocentral ADS1293 Arduino Library
 //
-//  Arduino uno connections:
+//  Author: Ashwin Whitchurch
+//  Copyright (c) 2020-2025 Protocentral Electronics
 //
-//  |pin label         | Pin Function         |Arduino Connection|
-//  |----------------- |:--------------------:|-----------------:|
-//  | MISO             | Slave Out            |  12              |
-//  | MOSI             | Slave In             |  11              |
-//  | SCLK             | Serial Clock         |  13              |
-//  | CS               | Chip Select          |  10              |
-//  | VCC              | Digital VDD          |  +5V             |
-//  | GND              | Digital Gnd          |  Gnd             |
-//  | DRDY             | Data ready           |  02              |
+//  SPDX-License-Identifier: MIT
 //
-//  This software is licensed under the MIT License(http://opensource.org/licenses/MIT).
+//  Permission is hereby granted, free of charge, to any person obtaining a copy
+//  of this software and associated documentation files (the "Software"), to deal
+//  in the Software without restriction, including without limitation the rights
+//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//  copies of the Software, and to permit persons to whom the Software is
+//  furnished to do so, subject to the following conditions:
 //
-//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
-//  NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-//  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-//  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-//  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
 //
-//  For information on how to use, visit https://github.com/Protocentral/protocentral-ads1293-arduino
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//  SOFTWARE.
 //
-/////////////////////////////////////////////////////////////////////////////////////////
+//  For more information, visit https://github.com/Protocentral/protocentral-ads1293-arduino
+//
+//////////////////////////////////////////////////////////////////////////////////////////
 
 
 #pragma once
@@ -54,6 +55,11 @@ enum class Register : uint8_t {
   CMDET_EN = 0x0A,
   CMDET_CN = 0x0B,
   RLD_CN = 0x0C,
+  // Wilson Central Terminal registers (0x0D-0x10)
+  WILSON_EN1 = 0x0D,
+  WILSON_EN2 = 0x0E,
+  WILSON_EN3 = 0x0F,
+  WILSON_CN = 0x10,
   REF_CN = 0x11,
   OSC_CN = 0x12,
   AFE_RES = 0x13,
@@ -71,18 +77,47 @@ enum class Register : uint8_t {
   DRDYB_SRC = 0x27,
   SYNCB_CN = 0x28,
   CH_CNFG = 0x2F,
+  DATA_STATUS = 0x30,
+  DATA_CH1_PACE = 0x31,
+  DATA_CH2_PACE = 0x32,
+  DATA_CH3_PACE = 0x33,
+  DATA_CH1_ECG = 0x37,
+  DATA_CH2_ECG = 0x3A,
+  DATA_CH3_ECG = 0x3D,
   REVID = 0x40
 };
 
 // Option enums for configuration helpers. Values map to register payloads used
-// by the original implementation. We provide explicit names so callers can
-// select options in a readable way.
-enum class FlexCh1Mode : uint8_t { Default = 0x11 };
-enum class FlexCh2Mode : uint8_t { Default = 0x19 };
+// by the original implementation and TI reference code.
+//
+// FLEX_CHx_CN register format (per ADS1293 datasheet):
+//   Bits [7:6]: Test signal selection (00=normal operation)
+//   Bits [5:3]: NEG input selection (001=IN1, 010=IN2, 011=IN3, 100=IN4, 101=IN5, 110=IN6)
+//   Bits [2:0]: POS input selection (001=IN1, 010=IN2, 011=IN3, 100=IN4, 101=IN5, 110=IN6)
+//
+// Values from TI reference (TI2093RegSetting.py):
+//   0x11 = CH1: IN2-IN1 (bits: 00 010 001) - LA-RA = Lead I
+//   0x19 = CH2: IN3-IN1 (bits: 00 011 001) - LL-RA = Lead II
+//   0x2E = CH3: IN5-IN6 (bits: 00 101 110) - V1-WCT
+enum class FlexCh1Mode : uint8_t { Default = 0x11 };  // Lead I: LA-RA
+enum class FlexCh2Mode : uint8_t { Default = 0x19 };  // Lead II: LL-RA
+// CMDET_EN: Enable common-mode detection on inputs
+// Bits correspond to IN1-IN6, set bit to enable CM detection on that input
+// 0x07 = IN1, IN2, IN3 enabled (RA, LA, LL)
 enum class CMDetMode : uint8_t { Enabled = 0x07 };
+
+// RLD_CN: Right Leg Drive configuration
+// Bits [2:0] select which input pin to drive RLD signal to
+// 0x04 = RLD output to IN4 (RL electrode)
 enum class RLDMode : uint8_t { Default = 0x04 };
 enum class OscMode : uint8_t { Default = 0x04 };
-enum class AFEShutdownMode : uint8_t { Default = 0x24, AFE_On = 0x00 };
+// AFE_SHDN_CN register: 0x00 = all AFE active (no shutdown)
+// Bits set to 1 shut down corresponding blocks
+enum class AFEShutdownMode : uint8_t {
+  AllEnabled = 0x00,       // All AFE channels active (no shutdown)
+  Ch1Ch2Only = 0x04,       // CH3 shutdown, CH1+CH2 active
+  AllShutdown = 0x3F       // All AFE channels shutdown
+};
 enum class R2Rate : uint8_t { Rate_2 = 0x02 };
 enum class R3Rate : uint8_t { Rate_2 = 0x02 };
 enum class DRDYSource : uint8_t { Default = 0x08 };
@@ -90,7 +125,8 @@ enum class ChannelConfig : uint8_t { Default3Lead = 0x30, Default5Lead = 0x70 };
 enum class GlobalConfig : uint8_t { Start = 0x01 };
 
 // FLEX_CH3 register mode (used by 5-lead example)
-enum class FlexCh3Mode : uint8_t { Default = 0x2E };
+// 0x2E = IN5-IN6 (bits: 00 101 110) - V1-WCT (from TI reference)
+enum class FlexCh3Mode : uint8_t { Default = 0x2E };  // V1-WCT
 
 // Reference configuration register helper
 enum class RefMode : uint8_t { Default = 0x01 };
@@ -140,14 +176,6 @@ public:
   // Read the raw 24-bit unsigned sample for channel (1..3). Returns true on success.
   bool getRaw24(uint8_t channel, uint32_t &raw24);
 
-  // Read the raw sample bytes for all three channels (9 bytes: ch1[MSB..LSB], ch2[MSB..LSB], ch3[MSB..LSB]).
-  // Useful for diagnostic/debug printing of the raw SPI payload.
-  bool readSampleBytes(uint8_t buf[9]);
-
-  // Dump a small set of diagnostic registers and the latest sample bytes to the provided Print
-  // (e.g., `Serial`). This prints REVID, ERR_STATUS and the 9 sample bytes in hex.
-  bool dumpDebug(Print &out);
-
   // Convert a 24-bit unsigned raw value to signed int32 using two's-complement
   // sign-extension. This library always interprets ADC output as two's-complement
   // 24-bit by default.
@@ -159,6 +187,10 @@ public:
   // Device information
   uint8_t readDeviceID();
   uint8_t readErrorStatus();
+
+  // Check if new data is available by reading DATA_STATUS register
+  // Returns true if any channel has new data ready (bits 0-2 indicate CH1-CH3)
+  bool isDataReady();
 
   // Channel and filter helpers
   void disableChannel(uint8_t channel);
@@ -175,7 +207,7 @@ public:
   bool enableCommonModeDetection(CMDetMode m = CMDetMode::Enabled);
   bool configureRLD(RLDMode m = RLDMode::Default);
   bool configureOscillator(OscMode m = OscMode::Default);
-  bool configureAFEShutdown(AFEShutdownMode m = AFEShutdownMode::Default);
+  bool configureAFEShutdown(AFEShutdownMode m = AFEShutdownMode::AllEnabled);
   bool configureRef(RefMode m = RefMode::Default);
   bool configureSamplingRates(R2Rate r2 = R2Rate::Rate_2, R3Rate r3ch1 = R3Rate::Rate_2, R3Rate r3ch2 = R3Rate::Rate_2);
   bool configureDRDYSource(DRDYSource m = DRDYSource::Default);
@@ -189,36 +221,20 @@ public:
   // Returns true if all channel routes were configured successfully.
   bool enableTestSignalAll(TestSignal sig);
 
-  // PGA gain helpers
-  // Raw write to CHnSET register (addresses 0x0A,0x0B,0x0C for channels 1..3).
-  bool setChannelGainRaw(uint8_t channel, uint8_t regValue);
-
-  // Convenience enum and wrapper for common gain presets.
-  enum class PgaGain : uint8_t {
-    G1 = 0x00,
-    G4 = 0x08, // example mapping from datasheet/example
-    G6 = 0x10,
-  G12 = 0x18,
-  G8 = 0x0C
-  };
-  bool setChannelGain(uint8_t channel, PgaGain gain);
+  // Wilson Central Terminal configuration for 5-lead ECG
+  // Configures the WCT buffers that connect input pins to the Wilson reference.
+  // Must be called for 5-lead ECG configurations.
+  bool configureWilsonCentralTerminal();
 
   // Sampling rate presets (output data rate, ODR) supported by setSamplingRate().
-  // These mappings assume the sigma-delta modulator clock fS = 102.4 kHz and
-  // R1 = 4 (default). The function programs R2 and R3 registers for all three
-  // ECG channels. If you change the AFE_RES (FS_HIGH) or R1_RATE, the resulting
-  // ODR will change.
+  // ODR = 102400 / (R1 * R2 * R3). With R1=4, R2=5, varying R3 gives these rates:
   enum class SamplingRate : uint8_t {
-    // Only include output rates that can be produced with R1=4, R2=4 and
-    // R3 in {4,6,8,12,16,32,64,128} (ODR = 102400 / (4*4*R3) = 6400 / R3)
-    SPS_1600, // R3=4
-    SPS_1067, // R3=6 (~1066.667)
-    SPS_800,  // R3=8
-    SPS_533,  // R3=12 (~533.333)
-    SPS_400,  // R3=16
-    SPS_200,  // R3=32
-    SPS_100,  // R3=64
-    SPS_50    // R3=128
+    SPS_853,  // R1=4, R2=6, R3=4  -> 102400/(4*6*4) = 1066
+    SPS_512,  // R1=4, R2=6, R3=8  -> 102400/(4*6*8) = 533
+    SPS_256,  // R1=4, R2=5, R3=8  -> 102400/(4*5*8) = 256
+    SPS_128,  // R1=4, R2=5, R3=16 -> 102400/(4*5*16) = 128
+    SPS_64,   // R1=4, R2=5, R3=32 -> 102400/(4*5*32) = 64
+    SPS_32    // R1=4, R2=5, R3=64 -> 102400/(4*5*64) = 32
   };
 
   // Configure R2/R3 rate registers for the requested output data rate (ODR).
@@ -241,7 +257,5 @@ private:
 // Backwards compatibility alias for existing sketches that used lowercase class name.
 using ads1293 = ADS1293;
 
-// PgaGain and SamplingRate are nested inside ADS1293; provide simple aliases
-// for convenience (left in global scope).
-using PgaGain = ADS1293::PgaGain;
+// SamplingRate is nested inside ADS1293; provide simple alias for convenience.
 using SamplingRate = ADS1293::SamplingRate;
