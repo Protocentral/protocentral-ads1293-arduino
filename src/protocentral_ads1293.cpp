@@ -1,21 +1,33 @@
 //////////////////////////////////////////////////////////////////////////////////////////
-// Protocentral ADS1293 - implementation
-// https://github.com/Protocentral/protocentral-ads1293-arduino
-// Copyright (c) 2020 ProtoCentral
-// Licensed under the MIT License
 //
-// Implementation notes:
-//  - Keep public API in the header. This TU focuses on small formatting
-//    and style cleanups. No public API renames are performed here.
-//  - Suggested non-breaking renames documented in TODO below.
+//  Protocentral ADS1293 Arduino Library
+//
+//  Author: Ashwin Whitchurch
+//  Copyright (c) 2020-2025 Protocentral Electronics
+//
+//  SPDX-License-Identifier: MIT
+//
+//  Permission is hereby granted, free of charge, to any person obtaining a copy
+//  of this software and associated documentation files (the "Software"), to deal
+//  in the Software without restriction, including without limitation the rights
+//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//  copies of the Software, and to permit persons to whom the Software is
+//  furnished to do so, subject to the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//  SOFTWARE.
+//
 //////////////////////////////////////////////////////////////////////////////////////////
 
 #include "protocentral_ads1293.h"
-
-// TODO (non-breaking): consider renaming internal helpers for clarity:
-//  - signExtend24 -> raw24_to_signed32
-//  - getRaw24 -> readRaw24 or readRawSample24
-//  - setSamplingRate -> configureSamplingRate
 
 ADS1293::ADS1293(uint8_t drdyPin, uint8_t csPin, SPIClass *spi) noexcept
 	: drdyPin_(drdyPin), csPin_(csPin), spi_(spi) {}
@@ -149,63 +161,11 @@ bool ADS1293::getRaw24(uint8_t channel, uint32_t &raw24)
 	return true;
 }
 
-bool ADS1293::readSampleBytes(uint8_t outBuf[9])
+float ADS1293::rawToVoltage(int32_t signedCode, float vref, int32_t adcFullscale, float gain) noexcept
 {
-	if (!spi_)
-		return false;
-	const uint8_t startAddr = 0x37;
-
-	spi_->beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
-	digitalWrite(csPin_, LOW);
-	spi_->transfer(startAddr | RREG_FLAG);
-	for (int i = 0; i < 9; ++i)
-		outBuf[i] = spi_->transfer(0x00);
-	digitalWrite(csPin_, HIGH);
-	spi_->endTransaction();
-	return true;
+	if (adcFullscale == 0) adcFullscale = (1 << 23) - 1;
+	return (static_cast<float>(signedCode) / static_cast<float>(adcFullscale)) * vref * gain;
 }
-
-bool ADS1293::dumpDebug(Print &out)
-{
-	if (!spi_)
-		return false;
-	uint8_t rev = 0, err = 0;
-	if (!readRegister(Register::REVID, rev))
-		return false;
-	if (!readRegister(Register::ERR_STATUS, err))
-		return false;
-	uint8_t buf9[9] = {0};
-	if (!readSampleBytes(buf9))
-		return false;
-
-	out.print(F("REVID=0x"));
-	if (rev < 16)
-		out.print('0');
-	out.println(rev, HEX);
-	out.print(F("ERR=0x"));
-	if (err < 16)
-		out.print('0');
-	out.println(err, HEX);
-	out.print(F("SAMPLES:"));
-	for (int i = 0; i < 9; ++i) {
-		out.print(' ');
-		uint8_t v = buf9[i];
-		if (v < 16)
-			out.print('0');
-		out.print(v, HEX);
-	}
-	out.println();
-	return true;
-}
-
-	// interpretRaw24 removed: library now always interprets ADC output as
-	// two's-complement 24-bit. Use signExtend24() for conversion.
-
-	float ADS1293::rawToVoltage(int32_t signedCode, float vref, int32_t adcFullscale, float gain) noexcept
-	{
-		if (adcFullscale == 0) adcFullscale = (1 << 23) - 1;
-		return (static_cast<float>(signedCode) / static_cast<float>(adcFullscale)) * vref * gain;
-	}
 
 ADS1293::Samples ADS1293::getECGData()
 {
@@ -235,6 +195,16 @@ uint8_t ADS1293::readErrorStatus()
 	return val;
 }
 
+bool ADS1293::isDataReady()
+{
+	uint8_t status = 0;
+	if (!readRegister(Register::DATA_STATUS, status))
+		return false;
+	// Bits 0-2 indicate new data ready for CH1-CH3
+	// Return true if any ECG channel has new data
+	return (status & 0x07) != 0;
+}
+
 bool ADS1293::begin3LeadECG()
 {
 	// perform the configuration steps in a clear, datasheet-aligned order
@@ -248,7 +218,7 @@ bool ADS1293::begin3LeadECG()
 		return false;
 	if (!configureOscillator(OscMode::Default))
 		return false;
-	if (!configureAFEShutdown(AFEShutdownMode::Default))
+	if (!configureAFEShutdown(AFEShutdownMode::AllEnabled))
 		return false;
 	if (!configureSamplingRates(R2Rate::Rate_2, R3Rate::Rate_2, R3Rate::Rate_2))
 		return false;
@@ -392,118 +362,82 @@ bool ADS1293::enableTestSignalAll(TestSignal sig)
 	return ok;
 }
 
-bool ADS1293::setChannelGainRaw(uint8_t channel, uint8_t regValue)
+bool ADS1293::configureWilsonCentralTerminal()
 {
-	if (channel < 1 || channel > 3) return false;
-	// CH1SET @ 0x0A, CH2SET @ 0x0B, CH3SET @ 0x0C
-	Register reg = static_cast<Register>(0x0A + (channel - 1));
-	bool ok = writeRegister(reg, regValue);
+	// Configure WCT (Wilson Central Terminal) for 5-lead ECG.
+	// These registers connect the internal Wilson reference buffers to input pins.
+	// Values from the original working 5-lead implementation.
+	bool ok = true;
+	ok &= writeRegister(Register::WILSON_EN1, 0x01);
+	delay(1);
+	ok &= writeRegister(Register::WILSON_EN2, 0x02);
+	delay(1);
+	ok &= writeRegister(Register::WILSON_EN3, 0x03);
+	delay(1);
+	ok &= writeRegister(Register::WILSON_CN, 0x01);
 	delay(1);
 	return ok;
 }
 
-bool ADS1293::setChannelGain(uint8_t channel, ADS1293::PgaGain gain)
-{
-	return setChannelGainRaw(channel, static_cast<uint8_t>(gain));
-}
-
 bool ADS1293::setSamplingRate(ADS1293::SamplingRate s)
 {
-	// Implement ODR configuration by programming the decimation stages
-	// R1 (0x25), R2 (0x21) and R3 (0x22/0x23/0x24) according to the datasheet.
-	// Algorithm: search allowed R1/R2/R3 combinations and pick the combination
-	// whose resulting ODR (fS/(R1*R2*R3)) is closest to the requested value.
-	// We assume the SDM clock fS = 102400 Hz by default (AFE_RES FS_HIGH = 0).
+	// Configure decimation registers for the requested sampling rate.
+	// ODR = fMOD / (R1 * R2 * R3), where fMOD = 102.4 kHz (default).
+	//
+	// R2_RATE register codes: 4->0x01, 5->0x02, 6->0x04, 8->0x08
+	// R3_RATE register codes: 4->0x01, 6->0x02, 8->0x04, 12->0x08, 16->0x10, 32->0x20, 64->0x40, 128->0x80
 
-	// Determine SDM clock (fS). Default is 102.4 kHz, but if the AFE_RES
-	// register indicates high-rate mode (FS_HIGH) the SDM clock is doubled
-	// to 204.8 kHz. Read the AFE_RES register to detect this.
-	float fs = 102400.0f; // default SDM clock per-channel when FS_HIGH=0
-	uint8_t afeRes = 0;
-	if (readRegister(Register::AFE_RES, afeRes)) {
-		// Datasheet labels a bit (FS_HIGH) in AFE_RES that enables higher SDM
-		// clock. Use bit mask 0x01 here (common mapping). If your hardware
-		// uses a different bit, we can adjust once you provide the register
-		// value from `readRegister(Register::AFE_RES)`.
-		if (afeRes & 0x01u) {
-			fs = 204800.0f;
-		}
-	}
+	uint8_t r2Reg = 0x02;  // R2=5 (default for most rates)
+	uint8_t r3Reg = 0x10;  // R3=16 (default for ~128 SPS)
 
-	// numeric target ODR for each supported enum (R1=4,R2=4; vary R3)
-	float targetHz = 0.0f;
 	switch (s)
 	{
-	case ADS1293::SamplingRate::SPS_1600: targetHz = 1600.0f; break;         // R3=4
-	case ADS1293::SamplingRate::SPS_1067: targetHz = 1066.6667f; break;    // R3=6
-	case ADS1293::SamplingRate::SPS_800:  targetHz = 800.0f; break;         // R3=8
-	case ADS1293::SamplingRate::SPS_533:  targetHz = 533.3333f; break;      // R3=12
-	case ADS1293::SamplingRate::SPS_400:  targetHz = 400.0f; break;         // R3=16
-	case ADS1293::SamplingRate::SPS_200:  targetHz = 200.0f; break;         // R3=32
-	case ADS1293::SamplingRate::SPS_100:  targetHz = 100.0f; break;         // R3=64
-	case ADS1293::SamplingRate::SPS_50:   targetHz = 50.0f; break;          // R3=128
-	default: return false;
+	case ADS1293::SamplingRate::SPS_853:
+		// 102400/(4*6*4) = 1066 SPS (closest available to 853)
+		r2Reg = 0x04;  // R2=6
+		r3Reg = 0x01;  // R3=4
+		break;
+	case ADS1293::SamplingRate::SPS_512:
+		// 102400/(4*5*4) = 1280 SPS, or 102400/(4*4*5)=1280
+		// For ~512: 102400/(4*5*8) = 256, need R2=4,R3=5 but 5 not available
+		// Use 102400/(4*4*8) = 800 or 102400/(4*5*4)=1280/2.5 not exact
+		// Best: 102400/(4*6*8) = 533 SPS
+		r2Reg = 0x04;  // R2=6
+		r3Reg = 0x04;  // R3=8
+		break;
+	case ADS1293::SamplingRate::SPS_256:
+		// 102400/(4*5*8) = 256 SPS
+		r2Reg = 0x02;  // R2=5
+		r3Reg = 0x04;  // R3=8
+		break;
+	case ADS1293::SamplingRate::SPS_128:
+		// 102400/(4*5*16) = 128 SPS
+		r2Reg = 0x02;  // R2=5
+		r3Reg = 0x10;  // R3=16
+		break;
+	case ADS1293::SamplingRate::SPS_64:
+		// 102400/(4*5*32) = 64 SPS
+		r2Reg = 0x02;  // R2=5
+		r3Reg = 0x20;  // R3=32
+		break;
+	case ADS1293::SamplingRate::SPS_32:
+		// 102400/(4*5*64) = 32 SPS
+		r2Reg = 0x02;  // R2=5
+		r3Reg = 0x40;  // R3=64
+		break;
+	default:
+		return false;
 	}
-
-	// Fix R1=4 and R2=4 per requirement. Only vary R3 from allowed candidates.
-	const uint8_t r1 = 4;
-	const uint8_t r2 = 4;
-	const uint8_t r3Candidates[] = {4, 6, 8, 12, 16, 32, 64, 128};
-
-	auto r2Code = [](uint8_t v) -> uint8_t {
-		switch (v) {
-		case 4: return 0x01;
-		case 5: return 0x02;
-		case 6: return 0x04;
-		case 8: return 0x08;
-		default: return 0x00;
-		}
-	};
-	auto r3Code = [](uint8_t v) -> uint8_t {
-		switch (v) {
-		case 4: return 0x01;
-		case 6: return 0x02;
-		case 8: return 0x04;
-		case 12: return 0x08;
-		case 16: return 0x10;
-		case 32: return 0x20;
-		case 64: return 0x40;
-		case 128: return 0x80;
-		default: return 0x00;
-		}
-	};
-
-	// Choose the R3 candidate that best matches targetHz with R1=4,R2=4
-	uint8_t chosenR3 = r3Candidates[0];
-	float bestErr = 1e9f;
-	for (uint8_t r3 : r3Candidates) {
-		float odr = fs / (static_cast<float>(r1) * static_cast<float>(r2) * static_cast<float>(r3));
-		float err = fabsf(odr - targetHz);
-		if (err < bestErr) {
-			bestErr = err;
-			chosenR3 = r3;
-		}
-		if (err == 0.0f) break;
-	}
-
-	uint8_t r1Reg = 0x00; // R1=4 -> bits cleared
-	uint8_t r2Reg = r2Code(r2); // r2=4 -> 0x01
-	uint8_t r3Reg = r3Code(chosenR3);
 
 	bool ok = true;
-	ok &= writeRegister(Register::R1_RATE, r1Reg);
 	ok &= writeRegister(Register::R2_RATE, r2Reg);
+	delay(1);
 	ok &= writeRegister(Register::R3_RATE_CH1, r3Reg);
+	delay(1);
 	ok &= writeRegister(Register::R3_RATE_CH2, r3Reg);
+	delay(1);
 	ok &= writeRegister(Register::R3_RATE_CH3, r3Reg);
 	delay(1);
-
-	// Verify writes by reading back at least R2 and R3
-	uint8_t verify = 0;
-	if (!readRegister(Register::R2_RATE, verify)) return false;
-	if (verify != r2Reg) return false;
-	if (!readRegister(Register::R3_RATE_CH1, verify)) return false;
-	if (verify != r3Reg) return false;
 
 	return ok;
 }

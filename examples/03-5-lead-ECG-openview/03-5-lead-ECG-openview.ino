@@ -2,30 +2,30 @@
 //
 //  Protocentral ADS1293 Arduino example — 5-lead ECG (OpenView packet format)
 //
-//  Author: Ashwin Whitchurch, Protocentral Electronics
-//  SPDX-FileCopyrightText: 2025 Protocentral Electronics
+//  Author: Ashwin Whitchurch
+//  Copyright (c) 2020-2025 Protocentral Electronics
+//
 //  SPDX-License-Identifier: MIT
 //
-//  Streams ECG samples in the OpenView packet format. See the OpenView
-//  project for the host-side processing tools:
-//    https://github.com/Protocentral/protocentral_openview
+//  Permission is hereby granted, free of charge, to any person obtaining a copy
+//  of this software and associated documentation files (the "Software"), to deal
+//  in the Software without restriction, including without limitation the rights
+//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//  copies of the Software, and to permit persons to whom the Software is
+//  furnished to do so, subject to the following conditions:
 //
-//  Hardware connections (Arduino UNO / ESP32 VSPI):
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
 //
-//  | Signal | Arduino UNO | ESP32 (VSPI default) |
-//  |-------:|:-----------:|:--------------------:|
-//  | MISO   | 12          | 19                   |
-//  | MOSI   | 11          | 23                   |
-//  | SCLK   | 13          | 18                   |
-//  | CS     | 4           | 4                    |
-//  | VCC    | +5V         | +5V                  |
-//  | GND    | GND         | GND                  |
-//  | DRDY   | 2           | 2                    |
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//  SOFTWARE.
 //
-//  For full documentation and examples, see:
-//    https://github.com/Protocentral/protocentral-ads1293-arduino
-//
-/////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////
 
 
 #include "protocentral_ads1293.h"
@@ -40,9 +40,6 @@
 
 #define DRDY_PIN 2
 #define CS_PIN 4
-
-// Uncomment to send voltages instead of raw ADC codes
-// #define PRINT_VOLTAGE
 
 // Optional SPI pin overrides
 #if !defined(SCK_PIN)
@@ -96,23 +93,6 @@ void sendDataThroughUart(int32_t ecgCh1, int32_t ecgCh2, int32_t ecgCh3) {
 	}
 }
 
-// Helper: convert 24-bit unsigned raw value to signed 32-bit using two's-complement
-static int32_t raw24_to_int24(uint32_t raw24) {
-	raw24 &= 0xFFFFFFu;
-	if (raw24 & 0x800000u) {
-		return static_cast<int32_t>(raw24 | 0xFF000000u);
-	}
-	return static_cast<int32_t>(raw24);
-}
-
-// Helper: build a 24-bit raw value from three bytes (MSB, mid, LSB)
-static uint32_t raw24_from_bytes(uint8_t msb, uint8_t mid, uint8_t lsb) {
-	return (static_cast<uint32_t>(msb) << 16) | (static_cast<uint32_t>(mid) << 8) | static_cast<uint32_t>(lsb);
-}
-
-// Uncomment to enable debug register/sample dumps on startup
-// #define ENABLE_DEBUG
-
 void setup() {
 	Serial.begin(57600);
 #if defined(ARDUINO_ARCH_ESP32)
@@ -126,40 +106,22 @@ void setup() {
 	ADS1293.configureChannel3(FlexCh3Mode::Default);
 	ADS1293.enableCommonModeDetection(CMDetMode::Enabled);
 	ADS1293.configureRLD(RLDMode::Default);
-	ADS1293.configureRef(RefMode::Default);
+	ADS1293.configureWilsonCentralTerminal();  // Required for 5-lead ECG
 	ADS1293.configureOscillator(OscMode::Default);
-	ADS1293.configureAFEShutdown(AFEShutdownMode::AFE_On);
-
-	ADS1293.setSamplingRate(ADS1293::SamplingRate::SPS_100);
-	ADS1293.setChannelGain(1, ADS1293::PgaGain::G8);
-	ADS1293.setChannelGain(2, ADS1293::PgaGain::G8);
-	ADS1293.setChannelGain(3, ADS1293::PgaGain::G8);
+	ADS1293.configureAFEShutdown(AFEShutdownMode::AllEnabled);
+	ADS1293.setSamplingRate(ADS1293::SamplingRate::SPS_128);
 	ADS1293.configureDRDYSource(DRDYSource::Default);
 	ADS1293.configureChannelConfig(ChannelConfig::Default5Lead);
 	ADS1293.applyGlobalConfig(GlobalConfig::Start);
-	delay(10);
 
-#if defined(ENABLE_DEBUG)
-	ADS1293.dumpDebug(Serial);
-#endif
+	delay(10);
 }
 
 void loop() {
-	if (digitalRead(DRDY_PIN) == LOW) {
-		// Use convenience overload to get all three channels in one call
+	if (ADS1293.isDataReady()) {
 		auto samples = ADS1293.getECGData();
 		if (samples.ok) {
-				// Read raw 24-bit values from the device, sign-extend to int32_t,
-				// and send as 32-bit little-endian (LSB first) in the packet payload.
-				uint32_t raw1 = 0, raw2 = 0, raw3 = 0;
-				if (ADS1293.getRaw24(1, raw1) && ADS1293.getRaw24(2, raw2) && ADS1293.getRaw24(3, raw3)) {
-					int32_t s1 = raw24_to_int24(raw1);
-					int32_t s2 = raw24_to_int24(raw2);
-					int32_t s3 = raw24_to_int24(raw3);
-					sendDataThroughUart(s1, s2, s3);
-				}
+			sendDataThroughUart(samples.ch1, samples.ch2, samples.ch3);
 		}
 	}
-	delay(10);
 }
-

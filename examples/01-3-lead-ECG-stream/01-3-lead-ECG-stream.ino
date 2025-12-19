@@ -2,28 +2,30 @@
 //
 //  Protocentral ADS1293 Arduino example — 3-lead ECG (Arduino Plotter)
 //
-//  Author: Ashwin Whitchurch, Protocentral Electronics
-//  SPDX-FileCopyrightText: 2025 Protocentral Electronics
+//  Author: Ashwin Whitchurch
+//  Copyright (c) 2020-2025 Protocentral Electronics
+//
 //  SPDX-License-Identifier: MIT
 //
-//  This example streams ECG samples to the Arduino IDE Plotter.
+//  Permission is hereby granted, free of charge, to any person obtaining a copy
+//  of this software and associated documentation files (the "Software"), to deal
+//  in the Software without restriction, including without limitation the rights
+//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//  copies of the Software, and to permit persons to whom the Software is
+//  furnished to do so, subject to the following conditions:
 //
-//  Hardware connections (Arduino UNO / ESP32 VSPI):
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
 //
-//  | Signal | Arduino UNO | ESP32 (VSPI default) |
-//  |-------:|:-----------:|:--------------------:|
-//  | MISO   | 12          | 19                   |
-//  | MOSI   | 11          | 23                   |
-//  | SCLK   | 13          | 18                   |
-//  | CS     | 4           | 4                    |
-//  | VCC    | +5V         | +5V                  |
-//  | GND    | GND         | GND                  |
-//  | DRDY   | 2           | 2                    |
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//  SOFTWARE.
 //
-//  For full documentation and examples, see:
-//    https://github.com/Protocentral/protocentral-ads1293-arduino
-//
-/////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////
 
 #include "protocentral_ads1293.h"
 #include <SPI.h>
@@ -63,14 +65,8 @@ void setup()
 	ADS1293.enableCommonModeDetection(CMDetMode::Enabled);
 	ADS1293.configureRLD(RLDMode::Default);
 	ADS1293.configureOscillator(OscMode::Default);
-
-	ADS1293.configureAFEShutdown(AFEShutdownMode::AFE_On);
-	ADS1293.setSamplingRate(ADS1293::SamplingRate::SPS_100);
-
-	ADS1293.setChannelGain(1, ADS1293::PgaGain::G8);
-	ADS1293.setChannelGain(2, ADS1293::PgaGain::G8);
-	ADS1293.setChannelGain(3, ADS1293::PgaGain::G8);
-
+	ADS1293.configureAFEShutdown(AFEShutdownMode::AllEnabled);
+	ADS1293.setSamplingRate(ADS1293::SamplingRate::SPS_128);
 	ADS1293.configureDRDYSource(DRDYSource::Default);
 	ADS1293.configureChannelConfig(ChannelConfig::Default3Lead);
 	ADS1293.applyGlobalConfig(GlobalConfig::Start);
@@ -80,7 +76,8 @@ void setup()
 
 void loop()
 {
-	if (digitalRead(DRDY_PIN) == LOW)
+	// Poll DATA_STATUS register to check if new data is available
+	if (ADS1293.isDataReady())
 	{
 		auto samples = ADS1293.getECGData();
 		if (samples.ok)
@@ -92,5 +89,4 @@ void loop()
 			Serial.println(samples.ch3);
 		}
 	}
-	delay(10);
 }
