@@ -41,6 +41,7 @@ void ADS1293::begin(bool startSPI)
 	{
 		spi_->begin();
 	}
+	resetToStandby();
 }
 
 void ADS1293::begin(uint8_t sck, uint8_t miso, uint8_t mosi)
@@ -58,6 +59,27 @@ void ADS1293::begin(uint8_t sck, uint8_t miso, uint8_t mosi)
 		spi_->begin();
 #endif
 	}
+	resetToStandby();
+}
+
+void ADS1293::resetToStandby()
+{
+	// Force a known state before any other configuration.
+	//
+	// Why: if the MCU resets without power-cycling the ADS1293 (USB re-flash,
+	// reset button, brown-out on the MCU rail), the chip retains its previous
+	// state. Per datasheet §8.6.1, when CONFIG.START_CON = 1 the chip locks
+	// writes to OSC_CN, REF_CN, AFE_RES and R*_RATE/DRDYB_SRC/SYNCB_CN/etc.
+	// (registers 0x11, 0x12, 0x13, 0x21-0x29). Subsequent reconfiguration is
+	// then silently dropped and the device appears stuck / returns zeros.
+	//
+	// Writing CONFIG = 0x00 stops conversion and clears standby. The 20 ms
+	// wait covers the datasheet's TSTART = 15 ms internal oscillator start-up
+	// time (Electrical Characteristics, CLOCK section), so subsequent register
+	// writes land on a chip with a stable clock.
+	if (!spi_) return;
+	writeRegister(Register::CONFIG, 0x00);
+	delay(20);
 }
 
 bool ADS1293::writeRegister(Register reg, uint8_t value) noexcept
@@ -65,7 +87,7 @@ bool ADS1293::writeRegister(Register reg, uint8_t value) noexcept
 	if (!spi_)
 		return false;
 	uint8_t addr = static_cast<uint8_t>(reg) & WREG_MASK;
-	spi_->beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+	spi_->beginTransaction(SPISettings(spiClockHz_, MSBFIRST, SPI_MODE0));
 	digitalWrite(csPin_, LOW);
 	spi_->transfer(addr);
 	spi_->transfer(value);
@@ -80,7 +102,7 @@ bool ADS1293::readRegister(Register reg, uint8_t &value) noexcept
 	if (!spi_)
 		return false;
 	uint8_t cmd = static_cast<uint8_t>(reg) | RREG_FLAG;
-	spi_->beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+	spi_->beginTransaction(SPISettings(spiClockHz_, MSBFIRST, SPI_MODE0));
 	digitalWrite(csPin_, LOW);
 	spi_->transfer(cmd);
 	value = spi_->transfer(0x00);
@@ -110,7 +132,7 @@ bool ADS1293::getECGData(int32_t &ch1, int32_t &ch2, int32_t &ch3)
 	const uint8_t startAddr = 0x37;
 	uint8_t buf[9] = {0};
 
-	spi_->beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+	spi_->beginTransaction(SPISettings(spiClockHz_, MSBFIRST, SPI_MODE0));
 	digitalWrite(csPin_, LOW);
 	spi_->transfer(startAddr | RREG_FLAG);
 	for (int i = 0; i < 9; ++i)
@@ -149,7 +171,7 @@ bool ADS1293::getRaw24(uint8_t channel, uint32_t &raw24)
 	const uint8_t startAddr = static_cast<uint8_t>(0x37 + ((channel - 1) * 3));
 	uint8_t buf3[3] = {0};
 
-	spi_->beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+	spi_->beginTransaction(SPISettings(spiClockHz_, MSBFIRST, SPI_MODE0));
 	digitalWrite(csPin_, LOW);
 	spi_->transfer(startAddr | RREG_FLAG);
 	for (int i = 0; i < 3; ++i)
@@ -195,6 +217,20 @@ uint8_t ADS1293::readErrorStatus()
 	return val;
 }
 
+ADS1293::Diagnostics ADS1293::readDiagnostics()
+{
+	Diagnostics d;
+	readRegister(Register::ERR_STATUS, d.error_status);
+	readRegister(Register::ERROR_RANGE1, d.error_range1);
+	readRegister(Register::ERROR_RANGE2, d.error_range2);
+	readRegister(Register::ERROR_RANGE3, d.error_range3);
+	readRegister(Register::ERROR_SYNC, d.error_sync);
+	readRegister(Register::ERROR_MISC, d.error_misc);
+	readRegister(Register::DATA_STATUS, d.data_status);
+	readRegister(Register::REVID, d.revid);
+	return d;
+}
+
 bool ADS1293::isDataReady()
 {
 	uint8_t status = 0;
@@ -205,8 +241,31 @@ bool ADS1293::isDataReady()
 	return (status & 0x07) != 0;
 }
 
+bool ADS1293::waitForFirstData(uint32_t timeoutMs)
+{
+	// After CONFIG.START_CON is set, the datasheet (§8.5.7) masks DRDYB for
+	// the first 6 ODR periods of the slowest enabled channel, and the SINC
+	// filter needs additional settling time (~5*R1*R2*R3/fS, §8.3.8). At
+	// 32 SPS that combined wait approaches 400 ms. Caller-supplied timeout
+	// should cover the slowest ODR they configure.
+	uint32_t deadline = millis() + timeoutMs;
+	while (static_cast<int32_t>(deadline - millis()) > 0)
+	{
+		if (isDataReady())
+			return true;
+		delay(1);
+	}
+	return false;
+}
+
 bool ADS1293::begin3LeadECG()
 {
+	// Ensure the chip is in standby with the oscillator settled before touching
+	// any of the lock-protected rate/clock registers further down. Safe to call
+	// even though begin() also does this — covers the re-init case where the
+	// caller invokes begin3LeadECG() again after a previous Start.
+	resetToStandby();
+
 	// perform the configuration steps in a clear, datasheet-aligned order
 	if (!configureChannel1(FlexCh1Mode::Default))
 		return false;
@@ -279,13 +338,16 @@ bool ADS1293::configureRef(RefMode m)
 	return writeRegister(Register::REF_CN, static_cast<uint8_t>(m));
 }
 
-bool ADS1293::configureSamplingRates(R2Rate r2, R3Rate r3ch1, R3Rate r3ch2)
+bool ADS1293::configureSamplingRates(R2Rate r2, R3Rate r3ch1, R3Rate r3ch2, R3Rate r3ch3)
 {
-	// R2_RATE and R3_RATE_CHx: sampling rate related registers
+	// R2_RATE and R3_RATE_CHx: sampling rate related registers.
+	// All three R3 channel registers are written so CH3 doesn't get left at its
+	// POR default of 0x80 (R3=128) when used in 5-lead configurations.
 	bool ok = true;
 	ok &= writeRegister(Register::R2_RATE, static_cast<uint8_t>(r2));
 	ok &= writeRegister(Register::R3_RATE_CH1, static_cast<uint8_t>(r3ch1));
 	ok &= writeRegister(Register::R3_RATE_CH2, static_cast<uint8_t>(r3ch2));
+	ok &= writeRegister(Register::R3_RATE_CH3, static_cast<uint8_t>(r3ch3));
 	return ok;
 }
 

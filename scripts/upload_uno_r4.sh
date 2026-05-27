@@ -10,9 +10,9 @@ set -e
 
 FQBN="arduino:renesas_uno:minima"
 SKETCH="examples/03-5-lead-ECG-openview"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-cd "$SCRIPT_DIR"
+cd "$REPO_ROOT"
 
 # Install core if not present
 if ! arduino-cli core list | grep -q "arduino:renesas_uno"; then

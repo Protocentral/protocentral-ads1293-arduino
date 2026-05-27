@@ -67,6 +67,11 @@ enum class Register : uint8_t {
   AFE_FAULT_CN = 0x15,
   AFE_PACE_CN = 0x17,
   ERR_STATUS = 0x19,
+  ERROR_RANGE1 = 0x1A,
+  ERROR_RANGE2 = 0x1B,
+  ERROR_RANGE3 = 0x1C,
+  ERROR_SYNC = 0x1D,
+  ERROR_MISC = 0x1E,
   MASK_ERR = 0x2A,
   R2_RATE = 0x21,
   R3_RATE_CH1 = 0x22,
@@ -150,6 +155,14 @@ public:
   // (convenience for platforms like ESP32 where SPI.begin(sck, miso, mosi) is common).
   void begin(uint8_t sck, uint8_t miso, uint8_t mosi);
 
+  // Stop any in-progress conversion (CONFIG = 0x00) and wait for the internal
+  // oscillator to stabilize (datasheet TSTART = 15 ms). Called automatically
+  // by begin(); also call manually before reconfiguring a chip that may
+  // already be running (e.g. after an MCU-only reset that did not power-cycle
+  // the ADS1293). Until this is called, writes to OSC_CN / R*_RATE /
+  // DRDYB_SRC / etc. are silently locked while START_CON = 1.
+  void resetToStandby();
+
   // Configuration helpers
   bool begin3LeadECG();
 
@@ -188,9 +201,40 @@ public:
   uint8_t readDeviceID();
   uint8_t readErrorStatus();
 
+  // Snapshot of the ADS1293's diagnostic registers. Useful when the device
+  // appears to "stop working" mid-run (returns zeros, no DRDY) — print this
+  // and consult the datasheet:
+  //   error_status (0x19):  power/clock/error summary
+  //   error_range1/2/3:     per-channel out-of-range flags (DIF_HIGH, OUT*_HIGH/LOW,
+  //                         SDM_OR — DIF_HIGH being the classic "INA saturated,
+  //                         SDM is now sampling 0 V" cause of mid-run zeros
+  //   error_sync (0x1D):    synchronization error (conversion halts)
+  //   error_misc (0x1E):    misc errors (e.g. battery low alarm)
+  //   data_status (0x30):   per-channel "new data" flags
+  //   revid (0x40):         non-zero means SPI itself is alive
+  struct Diagnostics {
+    uint8_t error_status = 0;
+    uint8_t error_range1 = 0;
+    uint8_t error_range2 = 0;
+    uint8_t error_range3 = 0;
+    uint8_t error_sync = 0;
+    uint8_t error_misc = 0;
+    uint8_t data_status = 0;
+    uint8_t revid = 0;
+  };
+  Diagnostics readDiagnostics();
+
   // Check if new data is available by reading DATA_STATUS register
   // Returns true if any channel has new data ready (bits 0-2 indicate CH1-CH3)
   bool isDataReady();
+
+  // Block until the first ECG sample is ready after starting conversions, or
+  // until timeoutMs elapses. Use after applyGlobalConfig(GlobalConfig::Start)
+  // to ride out the DRDYB mask window (6 ODR periods) and SINC filter
+  // settling time. Returns true on success, false on timeout.
+  // Default 500 ms covers down to ~32 SPS with margin; raise it for slower
+  // configurations.
+  bool waitForFirstData(uint32_t timeoutMs = 500);
 
   // Channel and filter helpers
   void disableChannel(uint8_t channel);
@@ -209,7 +253,7 @@ public:
   bool configureOscillator(OscMode m = OscMode::Default);
   bool configureAFEShutdown(AFEShutdownMode m = AFEShutdownMode::AllEnabled);
   bool configureRef(RefMode m = RefMode::Default);
-  bool configureSamplingRates(R2Rate r2 = R2Rate::Rate_2, R3Rate r3ch1 = R3Rate::Rate_2, R3Rate r3ch2 = R3Rate::Rate_2);
+  bool configureSamplingRates(R2Rate r2 = R2Rate::Rate_2, R3Rate r3ch1 = R3Rate::Rate_2, R3Rate r3ch2 = R3Rate::Rate_2, R3Rate r3ch3 = R3Rate::Rate_2);
   bool configureDRDYSource(DRDYSource m = DRDYSource::Default);
   bool configureChannelConfig(ChannelConfig m = ChannelConfig::Default3Lead);
   bool applyGlobalConfig(GlobalConfig m = GlobalConfig::Start);
@@ -241,10 +285,19 @@ public:
   // Returns true if all rate registers were written successfully.
   bool setSamplingRate(SamplingRate s);
 
+  // Set the SPI clock used for all subsequent register accesses (Hz).
+  // Default is 250 kHz, chosen as a conservative value that works reliably
+  // through auto-direction level translators like the NXB0108 (which lacks
+  // edge accelerators). The ADS1293 itself is rated to 20 MHz, so callers
+  // with a robust signal path can raise this — e.g. setSpiClockHz(4000000).
+  void setSpiClockHz(uint32_t hz) { spiClockHz_ = hz; }
+  uint32_t spiClockHz() const { return spiClockHz_; }
+
 private:
   uint8_t drdyPin_ = 255;
   uint8_t csPin_ = 255;
   SPIClass *spi_ = nullptr;
+  uint32_t spiClockHz_ = 250000;
 
   // low-level register access
   bool writeRegister(Register reg, uint8_t value) noexcept;
