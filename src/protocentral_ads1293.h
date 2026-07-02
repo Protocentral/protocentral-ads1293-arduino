@@ -106,10 +106,20 @@ enum class FlexCh2Mode : uint8_t { Default = 0x19 };  // Lead II: LL-RA
 // 0x07 = IN1, IN2, IN3 enabled (RA, LA, LL)
 enum class CMDetMode : uint8_t { Enabled = 0x07 };
 
-// RLD_CN: Right Leg Drive configuration
-// Bits [2:0] select which input pin to drive RLD signal to
-// 0x04 = RLD output to IN4 (RL electrode)
-enum class RLDMode : uint8_t { Default = 0x04 };
+// RLD_CN (0x0C): Right Leg Drive configuration (datasheet Fig.44, p.48)
+//   Bit  [3]   SHDN_RLD : 1 = power down the RLD amplifier
+//   Bits [2:0] SELRLD   : RLD output mux -> 000=disconnected,
+//                         001=IN1, 010=IN2, 011=IN3, 100=IN4, 101=IN5, 110=IN6
+enum class RLDMode : uint8_t {
+  Default      = 0x04,  // SELRLD=100 -> RLD output to IN4 (dedicated RL electrode)
+  ToIN1        = 0x01,  // SELRLD=001 -> RLD output to IN1
+  ToIN2        = 0x02,  // SELRLD=010 -> RLD output to IN2
+  ToIN3        = 0x03,  // SELRLD=011 -> RLD output to IN3
+  ToIN5        = 0x05,  // SELRLD=101 -> RLD output to IN5
+  ToIN6        = 0x06,  // SELRLD=110 -> RLD output to IN6
+  Disconnected = 0x00,  // SELRLD=000 -> RLD output disconnected
+  Shutdown     = 0x08   // SHDN_RLD=1  -> RLD amplifier powered down
+};
 enum class OscMode : uint8_t { Default = 0x04 };
 // AFE_SHDN_CN register: 0x00 = all AFE active (no shutdown)
 // Bits set to 1 shut down corresponding blocks
