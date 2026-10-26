@@ -101,7 +101,7 @@ void setup() {
     cfg.leadOff = false;
 
     if (!ads.begin(cfg)) {
-        Serial.print(F("ADS1293 not found, error "));
+        Serial.print(F("ADS1293 begin() failed, error "));
         Serial.println((int)ads.lastError());
         while (1) delay(1000);
     }

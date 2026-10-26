@@ -39,7 +39,7 @@ void setup() {
     while (!Serial && millis() - t0 < 3000) delay(10);
 
     if (!ads.begin()) {
-        Serial.print(F("ADS1293 not found, error "));
+        Serial.print(F("ADS1293 begin() failed, error "));
         Serial.println((int)ads.lastError());
         while (1) delay(1000);
     }

@@ -1085,7 +1085,8 @@ void Protocentral_ADS1293::printRegisters(Stream& out) {
         out.print(reg, HEX);
         out.print(F("  "));
         out.print(name);
-        out.print(F("\t0x"));
+        for (uint8_t pad = strlen_P(reinterpret_cast<const char*>(name)); pad < 15; pad++) out.print(' ');
+        out.print(F("0x"));
         if (v < 0x10) out.print('0');
         out.println(v, HEX);
     }

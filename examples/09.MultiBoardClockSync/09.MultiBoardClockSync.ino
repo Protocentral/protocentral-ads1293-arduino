@@ -41,7 +41,7 @@ void setup() {
     ADS1293_Config mcfg;
     mcfg.clockOutput = true;
     if (!master.begin(mcfg)) {
-        Serial.print(F("Master not found, error "));
+        Serial.print(F("Master begin() failed, error "));
         Serial.println((int)master.lastError());
         while (1) delay(1000);
     }
@@ -49,7 +49,7 @@ void setup() {
     ADS1293_Config scfg;
     scfg.clock = ADS1293_ClockSource::External;
     if (!slave.begin(scfg, false)) {  // SPI is already running
-        Serial.print(F("Slave not found, error "));
+        Serial.print(F("Slave begin() failed, error "));
         Serial.println((int)slave.lastError());
         Serial.println(F("NoClock (5) means the CLK link is missing"));
         while (1) delay(1000);
