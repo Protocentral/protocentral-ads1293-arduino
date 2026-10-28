@@ -1,1 +1,14 @@
+# Editor / OS
+.vscode/
+.DS_Store
+*.swp
+*~
+
+# Build artifacts
+build/
+.pio/
+
+# Local notes and vendor datasheets
 CLAUDE.md
+dev/
+docs/*.pdf
