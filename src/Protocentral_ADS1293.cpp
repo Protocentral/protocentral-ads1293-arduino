@@ -69,7 +69,16 @@ Protocentral_ADS1293::Protocentral_ADS1293(uint8_t csPin, int8_t drdyPin, int8_t
       _pending(false),
       _drdyFlag(false),
       _missed(0),
-      _irqSlot(-1) {
+      _irqSlot(-1),
+      _periodUs(5000),
+      _nextPollUs(0),
+      _lastPollUs(0),
+      _pollLocked(false),
+      _pollMissed(false),
+      _anchorUs(0),
+      _anchorSamples(0),
+      _drdyFault(false),
+      _drdyStrikes(0) {
     memset(_regs, 0, sizeof(_regs));
     memset(&_pendingSample, 0, sizeof(_pendingSample));
 }
@@ -89,6 +98,8 @@ bool Protocentral_ADS1293::begin(const ADS1293_Config& config, bool startSPI) {
     _config      = config;
     _syncMode    = config.sync;
     _autoSync    = true;
+    _drdyFault   = false;
+    _drdyStrikes = 0;
 
     // RST and SYNC first: on the v2 breakout they reach the chip through a level
     // shifter, and an undriven line can hold the chip in reset or keep resetting its filters
@@ -342,6 +353,7 @@ bool Protocentral_ADS1293::start() {
     }
     _pending  = false;
     _drdyFlag = false;
+    resetPolling();
     return updateRegister(ADS1293_REG_CONFIG, ADS1293_CONFIG_START_CON);
 }
 
@@ -633,14 +645,108 @@ bool Protocentral_ADS1293::available() {
         _drdyFlag = false;
         interrupts();
         if (!flag) return false;
-    } else if (_drdyPin >= 0 && digitalRead(_drdyPin) == HIGH) {
-        return false;
+        _pending = readFrame(_pendingSample);
+        return _pending;
+    }
+    if (_drdyPin >= 0 && !_drdyFault) return readOnDataReady();
+    return pollFrame();
+}
+
+bool Protocentral_ADS1293::readOnDataReady() {
+    uint32_t now = micros();
+    if (digitalRead(_drdyPin) == HIGH) {
+        // DRDY falls once per period. If it stays high, look at the chip directly now and then
+        if (now - _lastPollUs < 4 * _periodUs) return false;
+        _lastPollUs = now;
+        _pending    = readFrame(_pendingSample);
+        if (_pending && ++_drdyStrikes >= 4) {
+            _drdyFault = true;  // data kept waiting behind a high DRDY
+            resetPolling();
+        }
+        return _pending;
     }
 
-    // Without a DRDY pin this polls DATA_STATUS through the loop read. With one,
-    // the status byte still guards against a stuck or noisy DRDY line
-    _pending = readFrame(_pendingSample);
+    _lastPollUs = now;
+    _pending    = readFrame(_pendingSample);
+    // The read releases DRDY at once. A pin that stays low, or is low with no new data,
+    // is not following the chip (seen on boards with a faulty DRDY path)
+    if (!_pending || digitalRead(_drdyPin) == LOW) {
+        if (++_drdyStrikes >= 8) _drdyFault = true;
+    } else {
+        _drdyStrikes = 0;
+    }
+    if (_drdyFault) resetPolling();
     return _pending;
+}
+
+bool Protocentral_ADS1293::pollFrame() {
+    uint32_t now = micros();
+    if (static_cast<int32_t>(now - _nextPollUs) < 0) return false;
+
+    // A conversion that completes while a frame is being read can be lost, so polling
+    // back to back drops most samples. Instead, find when the data updates, then read
+    // once per period, half a period later
+    uint32_t step = _periodUs / 8;
+    _pending = readFrame(_pendingSample);
+    if (!_pending) {
+        _pollLocked = false;
+        _pollMissed = true;
+        _lastPollUs = now;
+        _nextPollUs = now + step;
+        return false;
+    }
+    _anchorSamples++;
+
+    if (_pollLocked) {
+        // Slightly short of a period, so any drift between the MCU clock and the chip's
+        // clock ends in an empty read (and a re-lock) rather than a skipped sample
+        uint32_t cadence = _periodUs - _periodUs / 256 - 1;
+        do {
+            _nextPollUs += cadence;
+        } while (static_cast<int32_t>(now - _nextPollUs) >= 0);
+    } else if (_pollMissed && now - _lastPollUs <= 2 * step) {
+        // The update happened between the last empty read and now
+        uint32_t updateUs = _lastPollUs + (now - _lastPollUs) / 2;
+        if (_anchorUs != 0 && _anchorSamples >= 16) {
+            // Measure the chip's period against the MCU clock, within 3 % of nominal
+            uint32_t measured = (updateUs - _anchorUs) / _anchorSamples;
+            uint32_t nominal  = dataReadyPeriodUs();
+            if (measured > nominal - nominal / 32 && measured < nominal + nominal / 32) _periodUs = measured;
+        }
+        _anchorUs      = updateUs;
+        _anchorSamples = 0;
+        _nextPollUs    = updateUs + _periodUs + _periodUs / 2;
+        _pollLocked    = true;
+    } else {
+        _nextPollUs = now + step;  // phase not known yet: keep searching
+    }
+    _pollMissed = false;
+    _lastPollUs = now;
+    return true;
+}
+
+void Protocentral_ADS1293::resetPolling() {
+    _periodUs      = dataReadyPeriodUs();
+    _pollLocked    = false;
+    _pollMissed    = false;
+    _anchorUs      = 0;
+    _anchorSamples = 0;
+    _nextPollUs    = micros();
+}
+
+uint32_t Protocentral_ADS1293::dataReadyPeriodUs() const {
+    uint8_t src  = _regs[ADS1293_REG_DRDYB_SRC];
+    uint8_t cfg  = _regs[ADS1293_REG_CH_CNFG];
+    float   rate = 0;
+    for (uint8_t ch = 0; ch < 3; ch++) {
+        ADS1293_Channel c = static_cast<ADS1293_Channel>(ch);
+        // The DRDYB source sets the period; without one, the fastest read-back source
+        bool pace = src ? (src & (0x01 << ch)) : (cfg & (0x02 << ch));
+        bool ecg  = src ? (src & (0x08 << ch)) : (cfg & (0x10 << ch));
+        if (pace && getPaceRate(c) > rate) rate = getPaceRate(c);
+        if (ecg && getSampleRate(c) > rate) rate = getSampleRate(c);
+    }
+    return rate > 0 ? static_cast<uint32_t>(1000000.0f / rate) : 1000;
 }
 
 bool Protocentral_ADS1293::read(ADS1293_Sample& sample) {
@@ -1258,6 +1364,7 @@ bool Protocentral_ADS1293::updateRegister(uint8_t reg, uint8_t value) {
     }
     _regs[reg] = value;
     if (reg == ADS1293_REG_CH_CNFG || reg == ADS1293_REG_DRDYB_SRC) updateLayout();
+    resetPolling();  // the output period or phase may have changed
     return true;
 }
 

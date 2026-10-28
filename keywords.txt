@@ -62,6 +62,7 @@ read	KEYWORD2
 enableDataReadyInterrupt	KEYWORD2
 disableDataReadyInterrupt	KEYWORD2
 missedSamples	KEYWORD2
+dataReadyPinFault	KEYWORD2
 setEcgReadback	KEYWORD2
 setPaceReadback	KEYWORD2
 setDataReadySource	KEYWORD2

@@ -128,10 +128,10 @@ void setup() {
         Serial.println(F("  DRDY OK"));
     } else if (drdyLowReads == drdyReads) {
         Serial.println(F("  DRDY stuck LOW - check the DRDY wire, remove any pull-up/pull-down on it."));
-        Serial.println(F("  The data still works: pass -1 as the DRDY pin to poll DATA_STATUS instead."));
+        Serial.println(F("  The data still works: the library detects this and polls the chip instead."));
     } else if (drdyLowReads == 0) {
         Serial.println(F("  DRDY stuck HIGH - check the DRDY wire and pin number."));
-        Serial.println(F("  The data still works: pass -1 as the DRDY pin to poll DATA_STATUS instead."));
+        Serial.println(F("  The data still works: the library detects this and polls the chip instead."));
     } else {
         Serial.println(F("  DRDY toggles irregularly - check the wiring for noise or a weak connection."));
     }

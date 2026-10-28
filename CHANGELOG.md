@@ -24,6 +24,8 @@ Ground-up rewrite. **Breaking:** the 1.x API is removed. See "Migrating from 1.x
   - ECG for all three channels and 16-bit digital pace data, with per-channel "updated" flags
   - lead-off and error flags attached to the sample whenever ALARMB is active
   - polled, DRDY-pin or interrupt-driven, with a missed-sample counter
+  - polling without DRDY reads once per output period, half a period after the data update. Reading back to back dropped about half the samples
+  - a DRDY pin that stays low or high while data arrives is detected (`dataReadyPinFault()`), and the driver switches to polling
   - `countsToMicrovolts()` / `paceCountsToMicrovolts()` using the correct ADCMAX for the current decimation
 - **Every ADS1293 feature from the datasheet:**
   - 15 data-rate presets from 25 to 1600 SPS, plus raw R2 / per-channel R3, double pace rate (R1) and the 204.8 kHz modulator clock

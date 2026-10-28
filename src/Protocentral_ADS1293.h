@@ -445,7 +445,11 @@ public:
 
     // ---- Reading data ------------------------------------------------------
 
-    /** @brief True when new data is waiting (DRDY low, the DRDY interrupt fired, or DATA_STATUS says so). */
+    /**
+     * @brief True when new data is waiting (DRDY low, the DRDY interrupt fired, or DATA_STATUS says so).
+     * Without a working DRDY pin the chip is polled once per output period, mid-period,
+     * so reads never overlap the data update.
+     */
     bool available();
 
     /** @brief Read the latest data. Call when available() is true. */
@@ -457,6 +461,9 @@ public:
 
     /** @brief Data-ready events that arrived before the previous one was read (interrupt mode only). */
     uint32_t missedSamples() const { return _missed; }
+
+    /** @brief True when the DRDY pin did not follow the chip and the driver switched to polling. */
+    bool dataReadyPinFault() const { return _drdyFault; }
 
     /** @brief Read ECG / pace data back in loop mode (CH_CNFG). The ECG of enabled channels is on by default. */
     bool setEcgReadback(ADS1293_Channel ch, bool enable);
@@ -648,6 +655,17 @@ private:
     volatile uint32_t _missed;
     int8_t            _irqSlot;
 
+    // Timed polling, used without a working DRDY pin
+    uint32_t _periodUs;    // output period of the DRDYB source
+    uint32_t _nextPollUs;
+    uint32_t _lastPollUs;
+    bool     _pollLocked;  // _nextPollUs falls mid-period, away from the data update
+    bool     _pollMissed;  // the previous poll found no new data
+    uint32_t _anchorUs;    // estimated time of a data update, for measuring the period
+    uint16_t _anchorSamples;
+    bool     _drdyFault;
+    uint8_t  _drdyStrikes;
+
     uint8_t rawReadRegister(uint8_t reg);
     void    rawWriteRegister(uint8_t reg, uint8_t value);
     bool    updateRegister(uint8_t reg, uint8_t value);
@@ -656,6 +674,10 @@ private:
     bool    startClock(ADS1293_ClockSource source, bool clockOutput);
     bool    waitForConversion(uint32_t timeoutMs);
     bool    readFrame(ADS1293_Sample& sample);
+    bool    readOnDataReady();
+    bool    pollFrame();
+    void    resetPolling();
+    uint32_t dataReadyPeriodUs() const;
     bool    selectDataReadySource();
     bool    selectSyncSource();
     void    driveControlPins();

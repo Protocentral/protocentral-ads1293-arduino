@@ -59,7 +59,7 @@ The board pinout, electrode placement and power options are in the [getting star
 | RST  | D5 | GPIO25 | GPIO5 | GPIO1 |
 | SYNC | D6 | GPIO26 | GPIO6 | GPIO10 |
 
-**RST and SYNC must be driven.** On the v2 board they reach the chip through a level shifter, with no pull-up on the header side. Pass them to the constructor and the library holds them in a defined state, or tie them to VCC and pass `-1`. An RST or SYNC pin that is left undriven can stop conversions.
+**Wire RST and SYNC to the MCU.** On the v2 board they reach the chip through a level shifter, with no pull-up on the header side. Connect both to MCU pins and pass those pins to the constructor; the library then holds them in a defined state. An RST or SYNC pin that is left undriven can stop conversions. (v1 boards have no SYNC pin: pass `-1` for it.)
 
 Power the board from your MCU's I/O voltage: the header's logic level equals VCC.
 
@@ -129,6 +129,7 @@ Any `SPIClass` and any pin can be used: `Protocentral_ADS1293 ads(CS, DRDY, RST,
 | `ADS1293_Status lastError()` | `Ok`, `SpiError`, `WrongChipId`, `VerifyFailed`, `NoClock`, `Timeout`, ... |
 | `bool available()` / `bool read(ADS1293_Sample&)` | New data is waiting / read it |
 | `enableDataReadyInterrupt()` / `missedSamples()` | Latch DRDY with an interrupt / count overwritten samples |
+| `dataReadyPinFault()` | True when DRDY did not follow the chip and the driver switched to polling |
 | `reset()` / `end()` | Reset and re-apply the configuration / power down |
 | `float countsToMicrovolts(counts, ch)` | Units |
 
@@ -169,8 +170,8 @@ Run `10.Diagnostics` first; it reports which stage fails.
 
 - **`SpiError`:** check the CSB/SCK/MOSI/MISO wiring, VCC and GND. On ESP32-S2/S3/C3, do not use pins 18/19/23.
 - **`VerifyFailed`:** registers do not read back correctly. Shorten the wires, or define `ADS1293_SPI_CLOCK 500000` before the include.
-- **`NoClock`, or data that comes and goes between resets:** check that RST and SYNC are driven (see Wiring), then power-cycle the board, not only the MCU.
-- **DRDY stuck:** remove any pull-up or pull-down from DRDY. If the data path works, pass `-1` as the DRDY pin and the library polls the chip instead.
+- **`NoClock`, or data that comes and goes between resets:** check that RST and SYNC are wired to the pins passed to the constructor (see Wiring), then power-cycle the board, not only the MCU.
+- **DRDY stuck:** remove any pull-up or pull-down from DRDY. The library notices a DRDY pin that does not follow the chip and polls instead (`dataReadyPinFault()` returns true); `10.Diagnostics` reports it.
 
 Electrode and signal-quality problems are covered in the [getting started guide](https://protocentral.com/product/protocentral-ads1293-breakout-board/docs/getting-started/).
 
