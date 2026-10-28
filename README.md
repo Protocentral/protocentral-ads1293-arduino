@@ -13,11 +13,11 @@ Arduino library for the **ProtoCentral ADS1293 Breakout**: 3-lead and 5-lead ECG
 
 | | |
 |---|---|
-| 🛒 Product page | https://protocentral.com/product/protocentral-ads1293-breakout-board/ |
-| 📖 Getting started guide | https://docs.protocentral.com/getting-started-with-ADS1293/ |
-| 🔧 Hardware design files | [hardware/v2](hardware/v2/) (KiCad) and [hardware/v1](hardware/v1/) (Eagle) in this repository |
-| 📈 OpenView companion app | https://github.com/Protocentral/protocentral_openview |
-| 📄 ADS1293 datasheet (TI SNAS602C) | https://www.ti.com/lit/ds/symlink/ads1293.pdf |
+| Product page | https://protocentral.com/product/protocentral-ads1293-breakout-board/ |
+| Getting started guide | https://docs.protocentral.com/getting-started-with-ADS1293/ |
+| Hardware design files | [hardware/v2](hardware/v2/) (KiCad) and [hardware/v1](hardware/v1/) (Eagle) in this repository |
+| OpenView companion app | https://github.com/Protocentral/protocentral_openview |
+| ADS1293 datasheet (TI SNAS602C) | https://www.ti.com/lit/ds/symlink/ads1293.pdf |
 
 ## How it works
 
@@ -32,16 +32,6 @@ The breakout wires the electrodes like this, and the library's lead sets use tha
 | **CH3** | off | V1 − WCT (Wilson central terminal, built on-chip from RA, LA and LL) |
 
 The right-leg drive holds the body at mid-supply through the RL electrode and cancels common-mode noise. Lead III and the augmented leads follow from Lead I and Lead II: III = II − I, aVR = −(I + II)/2, aVL = I − II/2, aVF = II − I/2.
-
-**The digital filter** has three decimation stages: R1, R2 and R3.
-- **Pace data:** after the second stage, the chip outputs 16-bit pace data at a high rate (up to 25.6 kSPS). This is the input for pacemaker-pulse detection.
-- **ECG data:** after the third stage, it outputs 24-bit ECG at 25–1600 SPS, or up to 6.4 kSPS with the fast modulator clock.
-- **Rate formula:** ECG rate = f<sub>MOD</sub> / (R1 × R2 × R3), with f<sub>MOD</sub> = 102.4 kHz.
-
-Each read returns, in one SPI transaction:
-- the data-status byte;
-- every enabled ECG and pace value;
-- when an alarm is active, also the lead-off flags and the error flags.
 
 ## Features
 
@@ -65,10 +55,6 @@ Each read returns, in one SPI transaction:
   - Alarm mask and alarm filter
 - **Clock:** on-board crystal or external 409.6 kHz clock; clock output for **multi-board sync**
 - **Data-ready handling:** polled with the DRDY pin, **interrupt-driven** with a missed-sample counter, or **without DRDY** by polling the chip's status register
-- **Robust bring-up**
-  - Every register write is verified by read-back
-  - The chip is reset to a known state even after an MCU-only reset
-  - `begin()` reports `NoClock` when the chip answers but makes no conversions
 - **Shared-bus safe:** SPI transactions on any `SPIClass`. Settings can be changed while streaming
 - **Standalone:** `depends=` is empty, so there is nothing else to install
 - **Host boards:** Uno, Nano, Mega, Leonardo, Uno R4, Nano 33 BLE, nRF52840, ESP32, ESP32-S3, ESP32-C3 and RP2040
