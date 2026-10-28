@@ -7,7 +7,7 @@ Arduino library for the **ProtoCentral ADS1293 Breakout**: 3-lead and 5-lead ECG
 
 ## Don't have one? [Buy it here](https://protocentral.com/product/protocentral-ads1293-breakout-board/)
 
-![ProtoCentral ADS1293 Breakout](docs/assets/product_image.jpg)
+![ProtoCentral ADS1293 Breakout v2](docs/assets/ads1293_breakout_v2.jpg)
 
 ## Links
 
@@ -100,8 +100,8 @@ Download this repository as a ZIP, then use **Sketch → Include Library → Add
 | 1 | DRDY | Data ready, active low | Optional: pass `-1` to poll the chip instead |
 | 2 | MOSI | SPI data in | SPI mode 0 |
 | 3 | MISO | SPI data out | |
-| 4 | SCLK | SPI clock | |
-| 5 | CS | SPI chip select | |
+| 4 | SCK | SPI clock | |
+| 5 | CSB | SPI chip select | |
 | 6 | RST | RSTB reset, active low | **Connect it** (see below) |
 | 7 | SYNC | SYNCB filter synchronization | **Connect it** (see below) |
 | 8 | ALARM | ALARMB, open drain, active low | Optional: the library reads the error registers instead |
@@ -116,17 +116,17 @@ Pins 1–8 go through a TXB0108 auto-direction level shifter, whose MCU side run
 
 If SYNC is not passed to the library, the library makes the chip drive SYNCB itself, so an unconnected SYNC pin is harmless. RST has no such fallback.
 
-**CLK** (409.6 kHz, for an external clock or multi-board sync) is on test point **TP1**, not the header. It is not level-shifted: 3.3 V signals only.
+**CLK** (409.6 kHz, for an external clock or multi-board sync) is on the **CLK OUT/IN** pad next to the level shifter, not the header. It is not level-shifted: 3.3 V signals only.
 
 ### Wiring
 
 | Breakout | Arduino Uno / Nano / R4 | ESP32 DevKit | ESP32-S3 DevKitC | ESP32-C3 | Others |
 |---|---|---|---|---|---|
-| CS   | D4  | GPIO5 (SS) | GPIO10 (SS) | GPIO7 (SS) | any pin |
+| CSB  | D4  | GPIO5 (SS) | GPIO10 (SS) | GPIO7 (SS) | any pin |
 | DRDY | D2  | GPIO4      | GPIO4       | GPIO3      | any pin (interrupt-capable for example 06) |
 | RST  | D5  | GPIO25     | GPIO5       | GPIO1      | any pin |
 | SYNC | D6  | GPIO26     | GPIO6       | GPIO10     | any pin |
-| SCLK | D13 | GPIO18     | GPIO12      | GPIO4      | board SPI SCK |
+| SCK  | D13 | GPIO18     | GPIO12      | GPIO4      | board SPI SCK |
 | MISO | D12 | GPIO19     | GPIO13      | GPIO5      | board SPI MISO |
 | MOSI | D11 | GPIO23     | GPIO11      | GPIO6      | board SPI MOSI |
 | VCC  | 5V  | 3V3        | 3V3         | 3V3        | MCU I/O voltage |
@@ -142,9 +142,9 @@ If SYNC is not passed to the library, the library makes the chip drive SYNCB its
 
 | | v2 (current) | v1 |
 |---|---|---|
-| Header | 10-pin: DRDY, MOSI, MISO, SCLK, CS, RST, SYNC, ALARM, VCC, GND | 12-pin: 5V, GND, ALARM, RST, OE, CS, MOSI, SCK, MISO, DRDY, CLK, GND |
+| Header | 10-pin: DRDY, MOSI, MISO, SCK, CSB, RST, SYNC, ALARM, VCC, GND | 12-pin: 5V, GND, ALARM, RST, OE, CS, MOSI, SCK, MISO, DRDY, CLK, GND |
 | SYNC | On the header | Not brought out (1 MΩ pull-up on the chip). Pass `-1` |
-| CLK | Test point TP1 | Header pin |
+| CLK | CLK OUT/IN pad | Header pin |
 | Logic level | Equal to VCC | Set by solder jumper SJ1 (VIN or 3.3 V) |
 | IN6 jumper | JP2 | JMP1 |
 
@@ -152,17 +152,17 @@ The same library and examples run on both revisions.
 
 ### Electrode placement
 
-The board has two 3.5 mm jacks. Use fresh gel electrodes on clean, dry skin.
+The board has two 3.5 mm jacks, CON1 and CON2. Use fresh gel electrodes on clean, dry skin.
 
 | Electrode | Placement | Jack | Contact | Input |
 |---|---|---|---|---|
-| **RA** | Right arm, or below the right collarbone | 1 | Ring | IN1 |
-| **LA** | Left arm, or below the left collarbone | 1 | Tip | IN2 |
-| **RL** | Right leg, or lower right abdomen | 1 | Sleeve | IN4 (right-leg drive) |
-| **LL** | Left leg, or lower left abdomen | 2 | Tip | IN3 |
-| **V1** | 4th intercostal space, right of the sternum | 2 | Sleeve | IN5 (5-lead only) |
+| **RA** | Right arm, or below the right collarbone | CON1 | Ring | IN1 |
+| **LA** | Left arm, or below the left collarbone | CON1 | Tip | IN2 |
+| **RL** | Right leg, or lower right abdomen | CON1 | Sleeve | IN4 (right-leg drive) |
+| **LL** | Left leg, or lower left abdomen | CON2 | Tip | IN3 |
+| **V1** | 4th intercostal space, right of the sternum | CON2 | Sleeve | IN5 (5-lead only) |
 
-**Jumper JP2** (JMP1 on v1) connects IN6 either to the ring of jack 2 or to the WCT pin. The 5-lead profile drives IN6 from the on-chip Wilson terminal, so make sure nothing is plugged into the ring of jack 2.
+**Solder jumper CONN IN6 / WCT** (JP2; JMP1 on v1) connects IN6 either to the ring of CON2 or to the WCT pin. The 5-lead profile drives IN6 from the on-chip Wilson terminal, so make sure nothing is plugged into the ring of CON2.
 
 ## Quick Start
 
@@ -406,7 +406,7 @@ Some ADS1293 features are limited by how the breakout is wired:
 | **SYNCB (v1 only)** | Not on the v1 header. Multi-board setups share the clock, but their filters are not phase-aligned |
 | **Goldberger terminals** | The chip connects them to IN4–IN6, and IN4 is the RL electrode. Disable the RLD before using them, or derive the augmented leads in software (see How it works) |
 | **Analog pace output to RLDIN** | RLDIN is tied to RLDREF on the board. Use the `Wct` output (WCT pin, via JP2 / JMP1) instead |
-| **CLK** | Test point TP1 on v2. Not level-shifted: 3.3 V signals only |
+| **CLK** | CLK OUT/IN pad on v2. Not level-shifted: 3.3 V signals only |
 
 ## Troubleshooting
 
@@ -421,7 +421,7 @@ Some ADS1293 features are limited by how the breakout is wired:
 - The chip answers but makes no conversions.
 - First check RST and SYNC: on v2 they must be wired to MCU pins passed to the constructor, or tied to VCC (see Header pins).
 - Power-cycle the board (not only the MCU) and run `10.Diagnostics`.
-- Check that the crystal runs: TP1 (CLK) reads about 1.65 V DC while the clock output is on.
+- Check that the crystal runs: the CLK OUT/IN pad reads about 1.65 V DC while the clock output is on.
 - Make sure nothing drives CLK.
 
 **No samples, or DRDY looks stuck (low, or at an intermediate voltage)**

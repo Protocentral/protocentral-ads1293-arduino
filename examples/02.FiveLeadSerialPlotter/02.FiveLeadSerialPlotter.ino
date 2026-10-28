@@ -8,8 +8,8 @@
 // inside the ADS1293 and routed to IN6). Serial Plotter, 115200 baud,
 // values in microvolts.
 //
-// Electrodes: RA, LA, RL on jack 1; LL and V1 on jack 2. Jumper JMP1 must not
-// connect IN6 to an electrode.
+// Electrodes: RA, LA, RL on CON1; LL and V1 on CON2. The CONN IN6 / WCT jumper
+// (JMP1 on v1) must not connect IN6 to an electrode.
 //
 // Wiring: see the README (Hardware Setup section).
 // For research and education only - not a medical device.

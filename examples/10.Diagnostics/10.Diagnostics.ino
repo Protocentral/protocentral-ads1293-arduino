@@ -87,8 +87,8 @@ void setup() {
             Serial.println(F("\nNo conversions. Check:"));
             Serial.println(F(" - RST and SYNC are wired to the pins above (v2 boards), or tied to VCC"));
             Serial.println(F(" - power-cycle the board (not just the MCU) and run this again"));
-            Serial.println(F(" - the 4.096 MHz crystal oscillates: TP1 (CLK) reads ~1.65 V with clock output on"));
-            Serial.println(F(" - nothing drives CLK (TP1 on v2, header pin on v1)"));
+            Serial.println(F(" - the 4.096 MHz crystal oscillates: CLK OUT/IN pad reads ~1.65 V with clock output on"));
+            Serial.println(F(" - nothing drives CLK (CLK OUT/IN pad on v2, header pin on v1)"));
         }
         return;
     }

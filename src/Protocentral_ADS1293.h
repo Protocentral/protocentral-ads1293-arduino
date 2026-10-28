@@ -146,7 +146,7 @@
 #define ADS1293_IN6 0x20
 
 // Electrode names for the ProtoCentral ADS1293 Breakout (from its netlist):
-// 3.5 mm jack 1 carries RA/LA/RL, jack 2 carries LL/V1; IN6 goes to jumper JMP1.
+// 3.5 mm jack CON1 carries RA/LA/RL, CON2 carries LL/V1; IN6 goes to the CONN IN6 / WCT jumper.
 #define ADS1293_ELECTRODE_RA ADS1293_IN1  ///< Right arm
 #define ADS1293_ELECTRODE_LA ADS1293_IN2  ///< Left arm
 #define ADS1293_ELECTRODE_LL ADS1293_IN3  ///< Left leg

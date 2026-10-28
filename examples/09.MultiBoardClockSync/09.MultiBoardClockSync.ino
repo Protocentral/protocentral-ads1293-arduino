@@ -12,7 +12,7 @@
 //   - both boards share SCK, MOSI, MISO, VCC and GND; each has its own CS
 //   - RST of both boards to PIN_RESET (driven by the master's driver)
 //   - SYNC of the master to SYNC of the slave (not to the MCU)
-//   - CLK of the master to CLK of the slave: test point TP1 on v2 boards,
+//   - CLK of the master to CLK of the slave: the CLK OUT/IN pad on v2 boards,
 //     the CLK header pin on v1. CLK is not level-shifted: 3.3 V only
 //   - only the master's DRDY goes to the MCU
 // v1 boards have no SYNC on the header: leave it out. The boards then share the
