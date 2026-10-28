@@ -14,6 +14,9 @@ Ground-up rewrite. **Breaking:** the 1.x API is removed. See "Migrating from 1.x
   - DRDY and RSTB pins optional (`-1`): without DRDY the driver polls DATA_STATUS
   - `bool begin()` with a REVID check and an `ADS1293_Status` from `lastError()`
   - `NoClock` status when the chip answers on SPI but makes no conversions
+  - optional RST and SYNC pins, driven by the library before any SPI access. On the v2 breakout both reach the chip through the level shifter, and an undriven line can stop conversions
+  - `ADS1293_SyncMode` (`Auto`, `Master`, `Slave`): without a SYNC pin the chip drives SYNCB itself, so an unconnected header pin cannot disturb it
+  - `reset()` re-applies the last configuration after an RSTB pulse
 - `ADS1293_Config` to set the complete device configuration in one call, with 3-lead, 5-lead and custom lead sets.
 - Every register write is verified by read-back. Setters work while streaming: registers locked by `START_CON` are written with conversions briefly stopped.
 - **Data path:**
@@ -36,12 +39,12 @@ Ground-up rewrite. **Breaking:** the 1.x API is removed. See "Migrating from 1.x
   - all error registers, alarm mask and alarm filter
   - DRDYB source selection (automatic by default) and masking, SDO drive strength
   - standby, power-down and wake-up
-- **Examples 01-10:** 3-lead and 5-lead Serial Plotter, OpenView, lead-off, self-test, interrupt-driven, pace detection, supply and alarms, multi-board clock sync, diagnostics.
+- **Examples 01-10:** 3-lead and 5-lead Serial Plotter, OpenView, lead-off, self-test, interrupt-driven, pace detection, supply and alarms, multi-board clock and SYNCB sync, diagnostics. All examples drive RST and SYNC.
 - **Repo tooling:** `CHANGELOG.md`, Arduino Lint and an 11-board compile workflow (including ESP32-S3 and nRF52840), and `scripts/build.sh`.
 
 ### Changed
 - Header renamed to `Protocentral_ADS1293.h` and the class to `Protocentral_ADS1293`. All public names carry an `ADS1293_` prefix.
-- Constructor order is now `(cs, drdy, reset, spi)` and takes the SPI bus by reference.
+- Constructor order is now `(cs, drdy, reset, sync, spi)` and takes the SPI bus by reference.
 - ECG samples are signed counts around mid-scale (0 = 0 V differential) instead of a sign-extended raw code.
 - The DRDY pin is configured as a plain input, without the internal pull-up, because the breakout drives it through a TXB0108 level shifter.
 - The OpenView example now matches OpenView's `ads1293` descriptor baud rate (115200) and streams at 200 SPS.

@@ -15,7 +15,7 @@ Arduino library for the **ProtoCentral ADS1293 Breakout**: 3-lead and 5-lead ECG
 |---|---|
 | 🛒 Product page | https://protocentral.com/product/protocentral-ads1293-breakout-board/ |
 | 📖 Getting started guide | https://docs.protocentral.com/getting-started-with-ADS1293/ |
-| 🔧 Hardware design files | [hardware/](hardware/) in this repository |
+| 🔧 Hardware design files | [hardware/v2](hardware/v2/) (KiCad) and [hardware/v1](hardware/v1/) (Eagle) in this repository |
 | 📈 OpenView companion app | https://github.com/Protocentral/protocentral_openview |
 | 📄 ADS1293 datasheet (TI SNAS602C) | https://www.ti.com/lit/ds/symlink/ads1293.pdf |
 
@@ -93,42 +93,62 @@ Download this repository as a ZIP, then use **Sketch → Include Library → Add
 
 ## Hardware Setup
 
-### Header pins
+### Header pins (v2 board)
 
-| Pin | Function | Notes |
-|---|---|---|
-| VCC | Power in, 3.3–5 V | Feeds the on-board 3.3 V regulator (AP2112K) that powers the ADS1293 |
-| GND | Ground | Two GND pins |
-| CS | SPI chip select | Level-shifted |
-| MOSI / SCK / MISO | SPI | Level-shifted, SPI mode 0 |
-| DRDY | Data ready, active low | Level-shifted. **Optional:** pass `-1` to poll the chip instead |
-| RST | RSTB reset, active low | Level-shifted, 1 MΩ pull-up on board. Optional |
-| ALARM | ALARMB, open drain, active low | Level-shifted, 1 MΩ pull-up on board. Optional: the library reads the error registers instead |
-| OE | Output enable for the optional on-board oscillator footprint | Leave unconnected |
-| CLK | ADS1293 CLK pin: clock input/output | **Not level-shifted, 3.3 V only.** Used for an external clock or multi-board sync |
+| Pin | Name | Function | Notes |
+|---|---|---|---|
+| 1 | DRDY | Data ready, active low | Optional: pass `-1` to poll the chip instead |
+| 2 | MOSI | SPI data in | SPI mode 0 |
+| 3 | MISO | SPI data out | |
+| 4 | SCLK | SPI clock | |
+| 5 | CS | SPI chip select | |
+| 6 | RST | RSTB reset, active low | **Connect it** (see below) |
+| 7 | SYNC | SYNCB filter synchronization | **Connect it** (see below) |
+| 8 | ALARM | ALARMB, open drain, active low | Optional: the library reads the error registers instead |
+| 9 | VCC | Power in, 3.3–5 V | Feeds the on-board 3.3 V regulator. **Also sets the logic level of pins 1–8** |
+| 10 | GND | Ground | |
 
-**Level shifter (TXB0108):**
-- All signals except CLK pass through an auto-direction TXB0108.
-- Do not put pull-up or pull-down resistors on these lines. The library sets DRDY as a plain input.
-- The logic level on the MCU side is selected by solder jumper **SJ1**: VCC or the on-board 3.3 V. Make sure it matches your board before connecting a 3.3 V-only MCU (ESP32, nRF52, RP2040) to a board powered from 5 V.
+Pins 1–8 go through a TXB0108 auto-direction level shifter, whose MCU side runs at VCC. Power the board from the same voltage as your MCU's I/O: 5 V for an Uno, 3.3 V for ESP32, nRF52 and RP2040. Do not put pull-up or pull-down resistors on these lines; the library sets DRDY as a plain input.
+
+**RST and SYNC must be driven.** The chip's own 1 MΩ pull-ups on these lines sit on the chip side of the level shifter, so the header pins have no defined level of their own. An RST or SYNC pin that is left unconnected, or wired to an MCU pin the sketch never configures, can hold the chip in reset or keep restarting its filters. The symptom is `NoClock`, or data that comes and goes between resets. Either:
+- wire both to MCU pins and pass them to the constructor: `Protocentral_ADS1293 ads(CS, DRDY, RST, SYNC);`. The library holds them HIGH. **(Recommended.)**
+- or tie both to VCC and pass `-1`.
+
+If SYNC is not passed to the library, the library makes the chip drive SYNCB itself, so an unconnected SYNC pin is harmless. RST has no such fallback.
+
+**CLK** (409.6 kHz, for an external clock or multi-board sync) is on test point **TP1**, not the header. It is not level-shifted: 3.3 V signals only.
 
 ### Wiring
 
-| Breakout | Arduino Uno / Nano | ESP32 DevKit | ESP32-S3 DevKitC | Others |
-|---|---|---|---|---|
-| CS   | D4  | GPIO5 (SS)  | GPIO10 (SS) | any pin |
-| DRDY | D2  | GPIO4       | GPIO4       | any pin (interrupt-capable for example 06) |
-| SCK  | D13 | GPIO18      | GPIO12      | board SPI SCK |
-| MISO | D12 | GPIO19      | GPIO13      | board SPI MISO |
-| MOSI | D11 | GPIO23      | GPIO11      | board SPI MOSI |
-| VCC  | 5V  | 3V3 or 5V   | 3V3 or 5V   | |
-| GND  | GND | GND         | GND         | |
+| Breakout | Arduino Uno / Nano / R4 | ESP32 DevKit | ESP32-S3 DevKitC | ESP32-C3 | Others |
+|---|---|---|---|---|---|
+| CS   | D4  | GPIO5 (SS) | GPIO10 (SS) | GPIO7 (SS) | any pin |
+| DRDY | D2  | GPIO4      | GPIO4       | GPIO3      | any pin (interrupt-capable for example 06) |
+| RST  | D5  | GPIO25     | GPIO5       | GPIO1      | any pin |
+| SYNC | D6  | GPIO26     | GPIO6       | GPIO10     | any pin |
+| SCLK | D13 | GPIO18     | GPIO12      | GPIO4      | board SPI SCK |
+| MISO | D12 | GPIO19     | GPIO13      | GPIO5      | board SPI MISO |
+| MOSI | D11 | GPIO23     | GPIO11      | GPIO6      | board SPI MOSI |
+| VCC  | 5V  | 3V3        | 3V3         | 3V3        | MCU I/O voltage |
+| GND  | GND | GND        | GND         | GND        | |
 
 **Pin notes**
-- **Default SPI pins:** the examples use each board's own SPI pins (`SPI.begin()`), so only CS and DRDY are chosen in the sketch. On ESP32-C3, DRDY defaults to GPIO3, because GPIO4 is the C3's SCK.
+- **Default SPI pins:** the examples use each board's own SPI pins (`SPI.begin()`), so only CS, DRDY, RST and SYNC are chosen in the sketch.
 - **Custom pins:** on ESP32, pass your own SPI pins with `ads.begin(sck, miso, mosi)`.
 - **ESP32-S2 / S3 / C3:** the classic ESP32 VSPI pins 18/19/23 are the USB pins on these chips, or do not exist.
 - **Uno interrupts:** DRDY on D2 is interrupt-capable, which example 06 needs.
+
+### Hardware revisions
+
+| | v2 (current) | v1 |
+|---|---|---|
+| Header | 10-pin: DRDY, MOSI, MISO, SCLK, CS, RST, SYNC, ALARM, VCC, GND | 12-pin: 5V, GND, ALARM, RST, OE, CS, MOSI, SCK, MISO, DRDY, CLK, GND |
+| SYNC | On the header | Not brought out (1 MΩ pull-up on the chip). Pass `-1` |
+| CLK | Test point TP1 | Header pin |
+| Logic level | Equal to VCC | Set by solder jumper SJ1 (VIN or 3.3 V) |
+| IN6 jumper | JP2 | JMP1 |
+
+The same library and examples run on both revisions.
 
 ### Electrode placement
 
@@ -142,7 +162,7 @@ The board has two 3.5 mm jacks. Use fresh gel electrodes on clean, dry skin.
 | **LL** | Left leg, or lower left abdomen | 2 | Tip | IN3 |
 | **V1** | 4th intercostal space, right of the sternum | 2 | Sleeve | IN5 (5-lead only) |
 
-**Jumper JMP1** connects IN6 either to the ring of jack 2 or to the WCT pin. The 5-lead profile drives IN6 from the on-chip Wilson terminal, so make sure nothing is plugged into the ring of jack 2.
+**Jumper JP2** (JMP1 on v1) connects IN6 either to the ring of jack 2 or to the WCT pin. The 5-lead profile drives IN6 from the on-chip Wilson terminal, so make sure nothing is plugged into the ring of jack 2.
 
 ## Quick Start
 
@@ -150,7 +170,7 @@ The board has two 3.5 mm jacks. Use fresh gel electrodes on clean, dry skin.
 #include <SPI.h>
 #include "Protocentral_ADS1293.h"
 
-Protocentral_ADS1293 ads(4 /*CS*/, 2 /*DRDY*/);
+Protocentral_ADS1293 ads(4 /*CS*/, 2 /*DRDY*/, 5 /*RST*/, 6 /*SYNC*/);
 
 void setup() {
     Serial.begin(115200);
@@ -196,6 +216,7 @@ ads.begin(cfg);
 | `dataRate` | `SPS_200` | ECG rate, all channels |
 | `clock` | `Crystal` | `Crystal` (on-board 4.096 MHz) or `External` (409.6 kHz on CLK) |
 | `clockOutput` | `false` | Drive the clock out on CLK (multi-board master) |
+| `sync` | `Auto` | SYNCB handling. `Auto`: the MCU holds SYNC HIGH, or the chip drives SYNCB itself if no SYNC pin is given. `Master` / `Slave`: multi-board sync (example 09) |
 | `highResolution` | `false` | High-resolution INA mode on every channel |
 | `rld` | `true` | Right-leg drive into RL (IN4) |
 | `leadOff` / `leadOffCurrent` | `true` / `32` nA | DC lead-off on the lead set's electrodes |
@@ -207,7 +228,7 @@ Every setter in the API reference also works later, even while streaming. The dr
 ### Using a different SPI bus or pins
 
 ```cpp
-Protocentral_ADS1293 ads(CS, DRDY, RST, SPI1);   // any SPIClass; DRDY and RST may be -1
+Protocentral_ADS1293 ads(CS, DRDY, RST, SYNC, SPI1);   // any SPIClass; any pin may be -1
 ads.begin(sck, miso, mosi);                      // ESP32 only: custom SPI pins
 ```
 
@@ -243,10 +264,11 @@ Noise figures are TI's low-power-mode values (datasheet Table 8). `highResolutio
 
 | Method | Description |
 |---|---|
-| `Protocentral_ADS1293(cs, drdy = -1, reset = -1, SPIClass& spi = SPI)` | `-1` = pin not wired |
-| `bool begin(bool startSPI = true)` | Reset, check REVID `0x01`, apply the 3-lead profile, start, verify conversions |
+| `Protocentral_ADS1293(cs, drdy = -1, reset = -1, sync = -1, SPIClass& spi = SPI)` | `-1` = pin not wired. RST and SYNC are driven by the library |
+| `bool begin(bool startSPI = true)` | Drive RST/SYNC, reset, check REVID `0x01`, apply the 3-lead profile, start, verify conversions |
 | `bool begin(const ADS1293_Config&, bool startSPI = true)` | Same, with a custom configuration |
 | `bool begin(sck, miso, mosi, config)` | ESP32 only: custom SPI pins |
+| `bool reset()` | Reset the chip (RSTB pulse if wired) and re-apply the last configuration |
 | `void end()` | Release the interrupt and power the chip down |
 | `ADS1293_Status lastError()` | `Ok`, `SpiError`, `WrongChipId`, `VerifyFailed`, `NoClock`, `Timeout`, `NotInterruptPin`, ... |
 | `bool isConnected()` / `uint8_t readID()` | Presence check / REVID register |
@@ -316,7 +338,8 @@ Channels are `ADS1293_Channel::CH1` / `CH2` / `CH3`. Inputs are `ADS1293_Input::
 |---|---|
 | `configureAnalogPace(enable, pos, neg, output)` | Fourth (analog) INA, output to `Wct` or `RldIn` |
 | `setClockOutput(bool)` | Drive the 409.6 kHz clock out on CLK |
-| `configureSync(output, source)` | SYNCB as input (default) or output |
+| `setSyncMode(ADS1293_SyncMode)` / `getSyncMode()` | `Auto`, `Master` or `Slave` SYNCB handling |
+| `configureSync(output, source)` | Manual SYNCB setting (overrides the sync mode) |
 | `setDriveStrength(ADS1293_DriveStrength)` | SDO drive strength |
 
 ### Errors, alarms and measurements
@@ -354,7 +377,7 @@ Channels are `ADS1293_Channel::CH1` / `CH2` / `CH3`. Inputs are `ADS1293_Input::
 | 06 | `06.InterruptDriven` | 400 SPS with an interrupt on DRDY and a missed-sample counter |
 | 07 | `07.PaceDetection` | 3.2 kSPS pace data and a simple pacemaker-pulse detector |
 | 08 | `08.SupplyAndAlarms` | Supply voltage and every error register, decoded |
-| 09 | `09.MultiBoardClockSync` | Two boards on one clock: six ECG channels |
+| 09 | `09.MultiBoardClockSync` | Two boards sharing clock and SYNCB: six ECG channels sampled in step |
 | 10 | `10.Diagnostics` | Version, REVID, register dump, clock, data-path, DRDY and signal-chain checks. **Run this first if something is wrong** |
 
 All examples print at **115200 baud**.
@@ -380,10 +403,10 @@ Some ADS1293 features are limited by how the breakout is wired:
 
 | Feature | On this board |
 |---|---|
-| **SYNCB** | Not on the header (1 MΩ pull-up only). Multi-board setups share the clock, but their filters are not phase-aligned |
+| **SYNCB (v1 only)** | Not on the v1 header. Multi-board setups share the clock, but their filters are not phase-aligned |
 | **Goldberger terminals** | The chip connects them to IN4–IN6, and IN4 is the RL electrode. Disable the RLD before using them, or derive the augmented leads in software (see How it works) |
-| **Analog pace output to RLDIN** | RLDIN is tied to RLDREF on the board. Use the `Wct` output (WCT pin, via JMP1) instead |
-| **CLK** | Not level-shifted: 3.3 V signals only |
+| **Analog pace output to RLDIN** | RLDIN is tied to RLDREF on the board. Use the `Wct` output (WCT pin, via JP2 / JMP1) instead |
+| **CLK** | Test point TP1 on v2. Not level-shifted: 3.3 V signals only |
 
 ## Troubleshooting
 
@@ -394,14 +417,16 @@ Some ADS1293 features are limited by how the breakout is wired:
 **`begin()` fails with `VerifyFailed`**
 - Registers are not reading back correctly. Shorten the wires, or define `ADS1293_SPI_CLOCK 500000` before the include.
 
-**`begin()` fails with `NoClock`**
-- The chip answers but makes no conversions, so its clock is not running.
+**`begin()` fails with `NoClock`, or data comes and goes between resets**
+- The chip answers but makes no conversions.
+- First check RST and SYNC: on v2 they must be wired to MCU pins passed to the constructor, or tied to VCC (see Header pins).
 - Power-cycle the board (not only the MCU) and run `10.Diagnostics`.
-- Make sure nothing drives the CLK header pin.
+- Check that the crystal runs: TP1 (CLK) reads about 1.65 V DC while the clock output is on.
+- Make sure nothing drives CLK.
 
 **No samples, or DRDY looks stuck (low, or at an intermediate voltage)**
 - Run `10.Diagnostics`. It checks the data path and the DRDY pin separately.
-- Remove any pull-up or pull-down from DRDY (the TXB0108 cannot drive them) and check SJ1.
+- Remove any pull-up or pull-down from DRDY (the TXB0108 cannot drive them). Check that VCC matches your MCU's I/O voltage (SJ1 on v1).
 - If DRDY is faulty but the data path is OK, pass `-1` as the DRDY pin. The library then polls the chip.
 
 **All electrodes report lead-off**
@@ -425,7 +450,7 @@ Version 2.0 is a ground-up rewrite, and the 1.x API has been removed.
 | 1.x | 2.0 |
 |---|---|
 | `#include "protocentral_ads1293.h"` | `#include "Protocentral_ADS1293.h"` |
-| `ads1293 ADS1293(DRDY, CS);` | `Protocentral_ADS1293 ads(CS, DRDY);` (note the order) |
+| `ads1293 ADS1293(DRDY, CS);` | `Protocentral_ADS1293 ads(CS, DRDY, RST, SYNC);` (note the order) |
 | `ADS1293.begin()` / `begin(sck, miso, mosi)` + ten `configure…()` calls | `ads.begin()` or `ads.begin(cfg)`, which returns `bool` |
 | `configureChannel3(...)` + `configureWilsonCentralTerminal()` | `cfg.leadSet = ADS1293_LeadSet::FiveLead` |
 | `setSamplingRate(SamplingRate::SPS_128)` (actually 320 SPS) | `setDataRate(ADS1293_DataRate::SPS_320)` (names are the real rates) |
@@ -445,7 +470,7 @@ See [CHANGELOG.md](CHANGELOG.md) for details.
 
 | | |
 |---|---|
-| Hardware design files | [hardware/](hardware/) |
+| Hardware design files | [hardware/v2](hardware/v2/), [hardware/v1](hardware/v1/) |
 | OpenView companion app | https://github.com/Protocentral/protocentral_openview |
 | TI ADS1293 datasheet (SNAS602C) | https://www.ti.com/lit/ds/symlink/ads1293.pdf |
 

@@ -12,3 +12,9 @@ build/
 CLAUDE.md
 dev/
 docs/*.pdf
+
+# KiCad local state
+*.kicad_prl
+*-backups/
+fp-info-cache
+*.lck

@@ -23,6 +23,7 @@ ADS1293_ACLeadOffLevel	KEYWORD1
 ADS1293_CapDrive	KEYWORD1
 ADS1293_PaceOutput	KEYWORD1
 ADS1293_DriveStrength	KEYWORD1
+ADS1293_SyncMode	KEYWORD1
 
 #######################################
 # Methods and Functions (KEYWORD2)
@@ -35,6 +36,7 @@ isConnected	KEYWORD2
 readID	KEYWORD2
 lastError	KEYWORD2
 getLibraryVersion	KEYWORD2
+reset	KEYWORD2
 
 # Conversion and power
 start	KEYWORD2
@@ -91,6 +93,8 @@ setReference	KEYWORD2
 configureAnalogPace	KEYWORD2
 setClockOutput	KEYWORD2
 configureSync	KEYWORD2
+setSyncMode	KEYWORD2
+getSyncMode	KEYWORD2
 setDriveStrength	KEYWORD2
 
 # Errors and alarms
