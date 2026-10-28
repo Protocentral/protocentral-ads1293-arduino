@@ -51,14 +51,18 @@ static bool isSingleBit(uint8_t v) {
 
 Protocentral_ADS1293* Protocentral_ADS1293::_irqInstances[ADS1293_MAX_IRQ_INSTANCES] = {nullptr, nullptr};
 
-Protocentral_ADS1293::Protocentral_ADS1293(uint8_t csPin, int8_t drdyPin, int8_t resetPin, SPIClass& spi)
+Protocentral_ADS1293::Protocentral_ADS1293(uint8_t csPin, int8_t drdyPin, int8_t resetPin, int8_t syncPin,
+                                           SPIClass& spi)
     : _csPin(csPin),
       _drdyPin(drdyPin),
       _resetPin(resetPin),
+      _syncPin(syncPin),
       _spi(&spi),
       _spiSettings(ADS1293_SPI_CLOCK, MSBFIRST, SPI_MODE0),
       _initialized(false),
       _autoDrdy(true),
+      _autoSync(true),
+      _syncMode(ADS1293_SyncMode::Auto),
       _lastError(ADS1293_Status::NotInitialized),
       _frameLen(1),
       _readyMask(ADS1293_STATUS_ECG_MASK | ADS1293_STATUS_PACE_MASK),
@@ -82,16 +86,19 @@ bool Protocentral_ADS1293::begin(bool startSPI) {
 bool Protocentral_ADS1293::begin(const ADS1293_Config& config, bool startSPI) {
     _initialized = false;
     _pending     = false;
+    _config      = config;
+    _syncMode    = config.sync;
+    _autoSync    = true;
+
+    // RST and SYNC first: on the v2 breakout they reach the chip through a level
+    // shifter, and an undriven line can hold the chip in reset or keep resetting its filters
+    driveControlPins();
 
     pinMode(_csPin, OUTPUT);
     digitalWrite(_csPin, HIGH);
     if (_drdyPin >= 0) {
         // No pull-up: DRDY reaches the header through a TXB0108, which must not drive a resistive load
         pinMode(_drdyPin, INPUT);
-    }
-    if (_resetPin >= 0) {
-        pinMode(_resetPin, OUTPUT);
-        digitalWrite(_resetPin, HIGH);
     }
 
     if (startSPI) {
@@ -163,6 +170,29 @@ void Protocentral_ADS1293::end() {
     powerDown();
     _initialized = false;
     _lastError   = ADS1293_Status::NotInitialized;
+}
+
+bool Protocentral_ADS1293::reset() {
+    // begin() pulses RSTB when it is wired, otherwise it stops the chip and rewrites every register
+    ADS1293_Config config = _config;
+    return begin(config, false);
+}
+
+void Protocentral_ADS1293::driveControlPins() {
+    if (_resetPin >= 0) {
+        digitalWrite(_resetPin, HIGH);  // set the level before enabling the driver: no glitch low
+        pinMode(_resetPin, OUTPUT);
+        digitalWrite(_resetPin, HIGH);
+    }
+    if (_syncPin >= 0) {
+        if (_syncMode == ADS1293_SyncMode::Auto) {
+            digitalWrite(_syncPin, HIGH);
+            pinMode(_syncPin, OUTPUT);
+            digitalWrite(_syncPin, HIGH);  // idle SYNCB, as the v1 board's pull-up did
+        } else {
+            pinMode(_syncPin, INPUT);      // master: the chip drives it; slave: the master board does
+        }
+    }
 }
 
 bool Protocentral_ADS1293::isConnected() {
@@ -471,7 +501,7 @@ void Protocentral_ADS1293::updateLayout() {
 bool Protocentral_ADS1293::selectDataReadySource() {
     if (!_autoDrdy) {
         updateLayout();
-        return true;
+        return selectSyncSource();
     }
 
     // TI recommends the fastest read-back source, so no data is lost
@@ -494,7 +524,44 @@ bool Protocentral_ADS1293::selectDataReadySource() {
 
     if (src != _regs[ADS1293_REG_DRDYB_SRC] && !updateRegister(ADS1293_REG_DRDYB_SRC, src)) return false;
     updateLayout();
-    return true;
+    return selectSyncSource();
+}
+
+bool Protocentral_ADS1293::selectSyncSource() {
+    if (!_autoSync) return true;
+
+    uint8_t value = ADS1293_SYNCB_DIS_OUT;  // input: follow the SYNC line
+    bool chipDrives = _syncMode == ADS1293_SyncMode::Master ||
+                      (_syncMode == ADS1293_SyncMode::Auto && _syncPin < 0);
+    if (chipDrives) {
+        // Drive SYNCB from the slowest read-back source (datasheet 8.3.21). The chip then
+        // ignores whatever is on the header, so an unwired SYNC pin cannot disturb it
+        uint8_t cfg  = _regs[ADS1293_REG_CH_CNFG];
+        uint8_t shdn = _regs[ADS1293_REG_AFE_SHDN_CN];
+        uint8_t src  = 0;
+        float   slowest = 0;
+        for (uint8_t ch = 0; ch < 3; ch++) {
+            if (shdn & (0x08 << ch)) continue;
+            ADS1293_Channel c = static_cast<ADS1293_Channel>(ch);
+            if ((cfg & (0x10 << ch)) && (slowest == 0 || getSampleRate(c) < slowest)) {
+                slowest = getSampleRate(c);
+                src     = 0x08 << ch;
+            }
+        }
+        if (src == 0) {
+            for (uint8_t ch = 0; ch < 3; ch++) {
+                ADS1293_Channel c = static_cast<ADS1293_Channel>(ch);
+                if (!(shdn & (0x08 << ch)) && (cfg & (0x02 << ch)) && (slowest == 0 || getPaceRate(c) < slowest)) {
+                    slowest = getPaceRate(c);
+                    src     = 0x01 << ch;
+                }
+            }
+        }
+        if (src) value = src;  // output driver enabled
+    }
+
+    if (value == _regs[ADS1293_REG_SYNCB_CN]) return true;
+    return updateRegister(ADS1293_REG_SYNCB_CN, value);
 }
 
 bool Protocentral_ADS1293::readFrame(ADS1293_Sample& sample) {
@@ -891,7 +958,26 @@ bool Protocentral_ADS1293::configureSync(bool output, ADS1293_DataSource source)
         _lastError = ADS1293_Status::InvalidArgument;
         return false;
     }
+    _autoSync = false;
     return updateRegister(ADS1293_REG_SYNCB_CN, (output ? 0 : ADS1293_SYNCB_DIS_OUT) | src);
+}
+
+bool Protocentral_ADS1293::setSyncMode(ADS1293_SyncMode mode) {
+    if (static_cast<uint8_t>(mode) > static_cast<uint8_t>(ADS1293_SyncMode::Slave)) {
+        _lastError = ADS1293_Status::InvalidArgument;
+        return false;
+    }
+    _syncMode    = mode;
+    _config.sync = mode;
+    _autoSync    = true;
+    // Release the line before the other side starts driving it
+    if (mode == ADS1293_SyncMode::Auto && _syncPin >= 0) {
+        bool ok = selectSyncSource();  // chip to input first
+        driveControlPins();            // then the MCU drives it HIGH
+        return ok;
+    }
+    driveControlPins();                // MCU to input first
+    return selectSyncSource();         // then the chip may drive it
 }
 
 bool Protocentral_ADS1293::setDriveStrength(ADS1293_DriveStrength strength) {

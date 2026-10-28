@@ -19,19 +19,23 @@
 #include <SPI.h>
 #include "Protocentral_ADS1293.h"
 
+// RST and SYNC must be driven: on the v2 breakout they reach the chip through a
+// level shifter. Pass -1 for a pin you tie to VCC instead (or for SYNC on v1 boards)
 #if defined(ARDUINO_ARCH_ESP32)
 #if defined(CONFIG_IDF_TARGET_ESP32C3)
-const int PIN_CS = SS, PIN_DRDY = 3;  // GPIO4 is the C3's default SCK
+const int PIN_CS = SS, PIN_DRDY = 3, PIN_RESET = 1, PIN_SYNC = 10;  // GPIO4 is the C3's default SCK
+#elif defined(CONFIG_IDF_TARGET_ESP32)
+const int PIN_CS = SS, PIN_DRDY = 4, PIN_RESET = 25, PIN_SYNC = 26;
 #else
-const int PIN_CS = SS, PIN_DRDY = 4;
+const int PIN_CS = SS, PIN_DRDY = 4, PIN_RESET = 5, PIN_SYNC = 6;   // ESP32-S2 / S3
 #endif
 #else
-const int PIN_CS = 4, PIN_DRDY = 2;
+const int PIN_CS = 4, PIN_DRDY = 2, PIN_RESET = 5, PIN_SYNC = 6;
 #endif
 
 // No DRDY pin for the driver: the data path is tested by polling, and DRDY is
 // watched separately so a DRDY fault cannot hide a working chip
-Protocentral_ADS1293 ads(PIN_CS);
+Protocentral_ADS1293 ads(PIN_CS, -1, PIN_RESET, PIN_SYNC);
 
 const __FlashStringHelper* statusText(ADS1293_Status st) {
     switch (st) {
@@ -64,15 +68,27 @@ void setup() {
     Serial.print(ads.readID(), HEX);
     Serial.println(F(" (expected 0x1)"));
 
+    Serial.print(F("RST pin: "));
+    Serial.print(PIN_RESET);
+    Serial.print(F(", SYNC pin: "));
+    Serial.print(PIN_SYNC);
+    Serial.print(F(", SYNCB "));
+    Serial.println((ads.readRegister(ADS1293_REG_SYNCB_CN) & ADS1293_SYNCB_DIS_OUT) ? F("input (MCU holds SYNC HIGH)")
+                                                                                     : F("output (chip drives it)"));
+    if (PIN_RESET < 0 || PIN_SYNC < 0) {
+        Serial.println(F("  RST or SYNC not driven by the MCU: on v2 boards tie it to VCC"));
+    }
+
     Serial.println(F("\nRegisters:"));
     ads.printRegisters(Serial);
 
     if (!ok) {
         if (ads.lastError() == ADS1293_Status::NoClock) {
             Serial.println(F("\nNo conversions. Check:"));
+            Serial.println(F(" - RST and SYNC are wired to the pins above (v2 boards), or tied to VCC"));
             Serial.println(F(" - power-cycle the board (not just the MCU) and run this again"));
-            Serial.println(F(" - the 4.096 MHz crystal oscillates (probe XTAL1 with a x10 probe)"));
-            Serial.println(F(" - nothing drives the CLK header pin"));
+            Serial.println(F(" - the 4.096 MHz crystal oscillates: TP1 (CLK) reads ~1.65 V with clock output on"));
+            Serial.println(F(" - nothing drives CLK (TP1 on v2, header pin on v1)"));
         }
         return;
     }

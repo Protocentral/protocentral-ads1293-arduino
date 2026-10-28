@@ -23,14 +23,18 @@
 
 #define FIVE_LEAD 0
 
+// RST and SYNC must be driven: on the v2 breakout they reach the chip through a
+// level shifter. Pass -1 for a pin you tie to VCC instead (or for SYNC on v1 boards)
 #if defined(ARDUINO_ARCH_ESP32)
 #if defined(CONFIG_IDF_TARGET_ESP32C3)
-const int PIN_CS = SS, PIN_DRDY = 3;  // GPIO4 is the C3's default SCK
+const int PIN_CS = SS, PIN_DRDY = 3, PIN_RESET = 1, PIN_SYNC = 10;  // GPIO4 is the C3's default SCK
+#elif defined(CONFIG_IDF_TARGET_ESP32)
+const int PIN_CS = SS, PIN_DRDY = 4, PIN_RESET = 25, PIN_SYNC = 26;
 #else
-const int PIN_CS = SS, PIN_DRDY = 4;
+const int PIN_CS = SS, PIN_DRDY = 4, PIN_RESET = 5, PIN_SYNC = 6;   // ESP32-S2 / S3
 #endif
 #else
-const int PIN_CS = 4, PIN_DRDY = 2;
+const int PIN_CS = 4, PIN_DRDY = 2, PIN_RESET = 5, PIN_SYNC = 6;
 #endif
 
 const uint8_t PKT_START_1 = 0x0A;
@@ -40,7 +44,7 @@ const uint8_t PKT_STOP_1  = 0x00;
 const uint8_t PKT_STOP_2  = 0x0B;
 const uint8_t PAYLOAD_LEN = 12;
 
-Protocentral_ADS1293 ads(PIN_CS, PIN_DRDY);
+Protocentral_ADS1293 ads(PIN_CS, PIN_DRDY, PIN_RESET, PIN_SYNC);
 
 static void putInt32(uint8_t* p, int32_t v) {
     p[0] = (uint8_t)(v & 0xFF);

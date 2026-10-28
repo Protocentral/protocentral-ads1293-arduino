@@ -313,6 +313,13 @@ enum class ADS1293_PaceOutput : uint8_t {
     RldIn = 2   ///< RLDIN pin (RLD amplifier then uses RLDREF internally)
 };
 
+/// How the SYNCB pin is handled (multi-channel / multi-board filter synchronization).
+enum class ADS1293_SyncMode : uint8_t {
+    Auto,    ///< Single board. With a SYNC pin, the MCU holds it HIGH; without one, the chip drives SYNCB itself
+    Master,  ///< The chip drives SYNCB from its slowest channel, for other boards to follow
+    Slave    ///< SYNCB is an input driven by a master board
+};
+
 /// SPI data-out drive strength (DIGO_STRENGTH). Use the lowest that works.
 enum class ADS1293_DriveStrength : uint8_t {
     Low        = 0,
@@ -345,6 +352,7 @@ struct ADS1293_Config {
     ADS1293_DataRate    dataRate = ADS1293_DataRate::SPS_200;
     ADS1293_ClockSource clock    = ADS1293_ClockSource::Crystal;
     bool clockOutput    = false;  ///< EN_CLKOUT: drive the 409.6 kHz clock out on CLK (crystal only; multi-board master)
+    ADS1293_SyncMode sync = ADS1293_SyncMode::Auto;  ///< SYNCB handling
 
     bool highResolution = false;  ///< EN_HIRES on every channel: lower INA noise for more supply current
 
@@ -367,10 +375,17 @@ public:
     /**
      * @param csPin     Chip select
      * @param drdyPin   Data ready (active low), or -1 to poll the DATA_STATUS register instead
-     * @param resetPin  RSTB, or -1 if not wired (begin() then stops the chip and rewrites every register)
+     * @param resetPin  RSTB, or -1 if not wired (begin() then stops the chip and rewrites every register).
+     *                  Held HIGH by the driver; pulsed LOW by begin() and reset()
+     * @param syncPin   SYNCB, or -1 if not wired. In ADS1293_SyncMode::Auto the driver holds it HIGH
      * @param spi       SPI bus
+     *
+     * On the v2 breakout RST and SYNC reach the chip through a level shifter.
+     * Wire them and pass the pins here, or tie them to VCC: never leave them
+     * connected to an undriven pin.
      */
-    Protocentral_ADS1293(uint8_t csPin, int8_t drdyPin = -1, int8_t resetPin = -1, SPIClass& spi = SPI);
+    Protocentral_ADS1293(uint8_t csPin, int8_t drdyPin = -1, int8_t resetPin = -1, int8_t syncPin = -1,
+                         SPIClass& spi = SPI);
 
     // ---- Initialisation ----------------------------------------------------
 
@@ -387,6 +402,9 @@ public:
 
     /** @brief Stop conversions, power the chip down and release the DRDY interrupt. */
     void end();
+
+    /** @brief Reset the chip (RSTB pulse if wired) and re-apply the configuration last passed to begin(). */
+    bool reset();
 
     bool    isConnected();
     uint8_t readID();
@@ -546,10 +564,15 @@ public:
     bool setClockOutput(bool enable);
 
     /**
-     * @brief SYNCB pin. As an output it is driven from @p source (use the slowest channel);
-     * as an input (default) the filters follow an external SYNCB.
+     * @brief Override the SYNCB pin setting chosen by ADS1293_Config::sync. As an output
+     * it is driven from @p source (use the slowest channel); as an input the filters
+     * follow an external SYNCB. Call setSyncMode() to return to automatic handling.
      */
     bool configureSync(bool output, ADS1293_DataSource source = ADS1293_DataSource::None);
+
+    /** @brief Change the SYNCB handling (also updates the SYNC pin if one is wired). */
+    bool setSyncMode(ADS1293_SyncMode mode);
+    ADS1293_SyncMode getSyncMode() const { return _syncMode; }
 
     /** @brief SDO drive strength. */
     bool setDriveStrength(ADS1293_DriveStrength strength);
@@ -602,13 +625,17 @@ private:
     uint8_t     _csPin;
     int8_t      _drdyPin;
     int8_t      _resetPin;
+    int8_t      _syncPin;
     SPIClass*   _spi;
     SPISettings _spiSettings;
 
     uint8_t _regs[ADS1293_NUM_CONFIG_REGS];  // shadow copy of the configuration registers
     bool    _initialized;
     bool    _autoDrdy;                       // driver picks the DRDYB source
-    ADS1293_Status _lastError;
+    bool    _autoSync;                       // driver sets SYNCB_CN from _syncMode
+    ADS1293_SyncMode _syncMode;
+    ADS1293_Config   _config;                // last configuration passed to begin(), for reset()
+    ADS1293_Status   _lastError;
 
     // Loop read-back layout, derived from CH_CNFG and DRDYB_SRC
     uint8_t _frameLen;
@@ -630,6 +657,8 @@ private:
     bool    waitForConversion(uint32_t timeoutMs);
     bool    readFrame(ADS1293_Sample& sample);
     bool    selectDataReadySource();
+    bool    selectSyncSource();
+    void    driveControlPins();
     void    updateLayout();
     void    hardwareReset();
     bool    setLeadOff(uint8_t lodCn, uint8_t lodEn, uint16_t currentNanoAmps, uint8_t acCn);

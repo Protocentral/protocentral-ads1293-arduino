@@ -14,14 +14,18 @@
 #include <SPI.h>
 #include "Protocentral_ADS1293.h"
 
+// RST and SYNC must be driven: on the v2 breakout they reach the chip through a
+// level shifter. Pass -1 for a pin you tie to VCC instead (or for SYNC on v1 boards)
 #if defined(ARDUINO_ARCH_ESP32)
 #if defined(CONFIG_IDF_TARGET_ESP32C3)
-const int PIN_CS = SS, PIN_DRDY = 3;  // GPIO4 is the C3's default SCK
+const int PIN_CS = SS, PIN_DRDY = 3, PIN_RESET = 1, PIN_SYNC = 10;  // GPIO4 is the C3's default SCK
+#elif defined(CONFIG_IDF_TARGET_ESP32)
+const int PIN_CS = SS, PIN_DRDY = 4, PIN_RESET = 25, PIN_SYNC = 26;
 #else
-const int PIN_CS = SS, PIN_DRDY = 4;
+const int PIN_CS = SS, PIN_DRDY = 4, PIN_RESET = 5, PIN_SYNC = 6;   // ESP32-S2 / S3
 #endif
 #else
-const int PIN_CS = 4, PIN_DRDY = 2;
+const int PIN_CS = 4, PIN_DRDY = 2, PIN_RESET = 5, PIN_SYNC = 6;
 #endif
 
 const uint8_t SETTLE  = 10;   // samples discarded after each switch
@@ -31,7 +35,7 @@ const float TEST_UV          = 200000.0f;  // VREF / 12
 const float TEST_TOLERANCE   = 0.05f;      // 5 %
 const float NOISE_LIMIT_UV   = 5.0f;       // datasheet: ~1.5 uV RMS at 200 SPS
 
-Protocentral_ADS1293 ads(PIN_CS, PIN_DRDY);
+Protocentral_ADS1293 ads(PIN_CS, PIN_DRDY, PIN_RESET, PIN_SYNC);
 
 // Average SAMPLES readings per channel; also returns the RMS deviation
 static bool measure(float meanUv[3], float rmsUv[3]) {
