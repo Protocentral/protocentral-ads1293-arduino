@@ -66,6 +66,7 @@ Ground-up rewrite. **Breaking:** the 1.x API is removed. See "Migrating from 1.x
 - `protocentral_ads1293.h`, the `ADS1293` / `ads1293` classes, the single-value option enums (`FlexCh1Mode`, `OscMode`, ...) and the global `SamplingRate` alias.
 - `scripts/flash.sh` and `scripts/upload_uno_r4.sh` (both pointed at example paths that no longer existed).
 - The vendor datasheet PDF from the repository; see the link in the README.
+- `hardware/`: the board design files (v1 and v2) live in [protocentral_ads1293](https://github.com/Protocentral/protocentral_ads1293).
 
 ## [1.3.0] - 2025-12-19
 
