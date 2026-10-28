@@ -20,7 +20,8 @@ on:
 jobs:
   build:
     name: ${{ matrix.board.name }}
-    runs-on: ubuntu-latest
+    # compile-sketches pins Python 3.12.4, which has no Ubuntu 26.04 build (ubuntu-latest)
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: false
