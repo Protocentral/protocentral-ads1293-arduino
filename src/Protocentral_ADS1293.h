@@ -548,7 +548,7 @@ public:
     /**
      * @brief Goldberger terminals G1-G3 from the three Wilson buffers, connected internally
      * to IN4, IN5 and IN6. On the ProtoCentral breakout IN4 is the RL electrode: disable the
-     * RLD first and see the README before using this.
+     * RLD first, or derive the augmented leads in software.
      */
     bool configureGoldberger(ADS1293_Input a, ADS1293_Input b, ADS1293_Input c);
 

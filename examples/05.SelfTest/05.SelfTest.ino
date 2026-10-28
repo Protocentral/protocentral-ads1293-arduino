@@ -8,7 +8,7 @@
 //   - positive and negative internal test signals, +/-VREF/12 = +/-200 mV
 //   - shorted inputs: offset and RMS noise floor
 //
-// Wiring: see the README (Hardware Setup section).
+// Wiring: see the Wiring section of the README.
 // For research and education only - not a medical device.
 
 #include <SPI.h>

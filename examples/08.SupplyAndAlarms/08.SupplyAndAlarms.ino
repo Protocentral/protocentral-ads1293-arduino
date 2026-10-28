@@ -10,7 +10,7 @@
 //
 // Disconnect an electrode or the RL lead to see the flags change.
 //
-// Wiring: see the README (Hardware Setup section).
+// Wiring: see the Wiring section of the README.
 // For research and education only - not a medical device.
 
 #include <SPI.h>

@@ -12,7 +12,7 @@
 // Test it with an ECG simulator that has a pacemaker output. The threshold is
 // a starting point, not a validated detector.
 //
-// Wiring: see the README (Hardware Setup section).
+// Wiring: see the Wiring section of the README.
 // For research and education only - not a medical device.
 
 #include <SPI.h>

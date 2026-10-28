@@ -12,7 +12,7 @@
 // Both modes need the RL electrode: the current returns through the body to
 // the right-leg drive. With RL off, every electrode reports off.
 //
-// Wiring: see the README (Hardware Setup section).
+// Wiring: see the Wiring section of the README.
 // For research and education only - not a medical device.
 
 #include <SPI.h>

@@ -8,7 +8,7 @@
 // CH1 measures Lead I and CH2 Lead II; Lead III = II - I is computed.
 // Values are in microvolts at the electrodes.
 //
-// Wiring: see the README (Hardware Setup section).
+// Wiring: see the Wiring section of the README.
 // For research and education only - not a medical device.
 
 #include <SPI.h>

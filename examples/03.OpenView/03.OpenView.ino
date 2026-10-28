@@ -15,7 +15,7 @@
 //
 // This sketch prints nothing but packets - any other text would corrupt the stream.
 //
-// Wiring: see the README (Hardware Setup section).
+// Wiring: see the Wiring section of the README.
 // For research and education only - not a medical device.
 
 #include <SPI.h>

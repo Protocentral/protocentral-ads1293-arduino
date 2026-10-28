@@ -11,7 +11,7 @@
 // Electrodes: RA, LA, RL on CON1; LL and V1 on CON2. The CONN IN6 / WCT jumper
 // (JMP1 on v1) must not connect IN6 to an electrode.
 //
-// Wiring: see the README (Hardware Setup section).
+// Wiring: see the Wiring section of the README.
 // For research and education only - not a medical device.
 
 #include <SPI.h>
